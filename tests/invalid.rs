@@ -29,8 +29,16 @@ fn rejects_raw_pointers_via_extern() {
 }
 
 #[test]
-fn rejects_traits() {
-    assert_rejects("trait Foo { fn bar(&self); }", "trait");
+fn rejects_async_methods_in_impl() {
+    assert_rejects(
+        r#"
+        struct S;
+        impl S {
+            async fn bar(&self) {}
+        }
+        "#,
+        "async",
+    );
 }
 
 #[test]

@@ -28,6 +28,10 @@ pub enum Decl {
     Func(Func),
     Data(DataType),
     Const { name: String, ty: Ty, value: Exp },
+    /// Haskell type class from a Rust trait.
+    Class(Class),
+    /// Haskell instance from `impl Trait for Type`.
+    Instance(Instance),
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +41,30 @@ pub struct Func {
     pub return_ty: Ty,
     pub body: Exp,
     pub notes: Vec<String>,
+    /// Lowercase Haskell type variables, e.g. `["a", "b"]`.
+    pub type_vars: Vec<String>,
+    /// Constraints `(ClassName, type_var)`, e.g. `("Display", "a")`.
+    pub constraints: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Class {
+    pub name: String,
+    pub type_var: String,
+    pub methods: Vec<ClassMethod>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassMethod {
+    pub name: String,
+    pub ty: Ty,
+}
+
+#[derive(Debug, Clone)]
+pub struct Instance {
+    pub class: String,
+    pub ty: Ty,
+    pub methods: Vec<Func>,
 }
 
 #[derive(Debug, Clone)]

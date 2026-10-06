@@ -308,6 +308,103 @@ pub fn detect_scalar_mutation(block: &Block) -> Option<(String, Expr, Vec<(BinOp
     Some((name, init, ops))
 }
 
+/// Recognised while-loop accumulator pattern:
+/// ```ignore
+/// let mut n = START;
+/// let mut acc = INIT;
+/// while n > 0 {
+///     acc += n;
+///     n -= 1;
+/// }
+/// acc
+/// ```
+#[derive(Debug, Clone)]
+pub struct WhileAccum {
+    pub counter: String,
+    pub counter_init: Expr,
+    pub acc: String,
+    pub acc_init: Expr,
+    pub cond: Expr,
+    /// Updates inside the loop: (target_name, op, value)
+    pub updates: Vec<(String, BinOp, Expr)>,
+}
+
+pub fn detect_while_accum(block: &Block) -> Option<WhileAccum> {
+    if block.stmts.len() < 3 {
+        return None;
+    }
+    let (counter, counter_init) = match &block.stmts[0] {
+        Stmt::Let {
+            name,
+            is_mut: true,
+            value: Some(v),
+            ..
+        } => (name.clone(), v.clone()),
+        _ => return None,
+    };
+    let (acc, acc_init) = match &block.stmts[1] {
+        Stmt::Let {
+            name,
+            is_mut: true,
+            value: Some(v),
+            ..
+        } => (name.clone(), v.clone()),
+        _ => return None,
+    };
+    if !matches!(&block.expr, Some(e) if matches!(e.as_ref(), Expr::Path(n, _) if n == &acc)) {
+        return None;
+    }
+    let (cond, body) = match &block.stmts[2] {
+        Stmt::Expr(Expr::While { cond, body, .. }) => (cond.as_ref().clone(), body),
+        _ => return None,
+    };
+    let mut updates = Vec::new();
+    for stmt in &body.stmts {
+        match stmt {
+            Stmt::Expr(Expr::AssignOp {
+                op,
+                target,
+                value,
+                ..
+            }) => {
+                if let Expr::Path(n, _) = target.as_ref() {
+                    if n == &counter || n == &acc {
+                        updates.push((n.clone(), *op, value.as_ref().clone()));
+                        continue;
+                    }
+                }
+                return None;
+            }
+            _ => return None,
+        }
+    }
+    // Also allow trailing assign-op as body expr
+    if let Some(Expr::AssignOp {
+        op,
+        target,
+        value,
+        ..
+    }) = body.expr.as_deref()
+    {
+        if let Expr::Path(n, _) = target.as_ref() {
+            if n == &counter || n == &acc {
+                updates.push((n.clone(), *op, value.as_ref().clone()));
+            }
+        }
+    }
+    if updates.is_empty() {
+        return None;
+    }
+    Some(WhileAccum {
+        counter,
+        counter_init,
+        acc,
+        acc_init,
+        cond,
+        updates,
+    })
+}
+
 /// Peel iterator method chains into (base, steps).
 /// e.g. values.iter().filter(...).map(...).collect()
 #[derive(Debug, Clone)]
@@ -353,6 +450,12 @@ pub fn peel_iterator_chain(expr: &Expr) -> Option<(Expr, Vec<IterStep>)> {
                         | "chain"
                         | "zip"
                         | "filter_map"
+                        | "partition"
+                        | "max"
+                        | "min"
+                        | "product"
+                        | "position"
+                        | "rposition"
                 ) {
                     steps.push(IterStep {
                         method: method.clone(),

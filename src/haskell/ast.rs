@@ -41,6 +41,8 @@ pub enum HsDecl {
     },
     TypeSig {
         name: String,
+        /// Optional constraints rendered as `Display a => …`
+        constraints: Vec<(String, String)>,
         ty: HsType,
     },
     FunBind {
@@ -50,6 +52,16 @@ pub enum HsDecl {
     PatBind {
         name: String,
         body: HsExp,
+    },
+    Class {
+        name: String,
+        type_var: String,
+        methods: Vec<(String, HsType)>,
+    },
+    Instance {
+        class: String,
+        ty: HsType,
+        methods: Vec<(String, Vec<HsPat>, HsExp)>,
     },
 }
 
@@ -77,6 +89,8 @@ pub enum HsType {
     Tuple(Vec<HsType>),
     List(Box<HsType>),
     Paren(Box<HsType>),
+    /// `Ctx => ty` — stored on TypeSig preferably; also allowed inline.
+    Constrained(Vec<(String, String)>, Box<HsType>),
 }
 
 #[derive(Debug, Clone)]

@@ -12,10 +12,6 @@ use std::process::ExitCode;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
-
-    /// Print version
-    #[arg(long, short = 'V')]
-    pub version: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -43,14 +39,9 @@ pub enum Commands {
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
 
-    if cli.version {
-        println!("raskell {VERSION}");
-        return ExitCode::SUCCESS;
-    }
-
     match cli.command {
         None => {
-            // clap --help is automatic; without subcommand show brief usage
+            // clap --help / --version are automatic; without subcommand show brief usage
             eprintln!("raskell {VERSION}");
             eprintln!("Usage: raskell <COMMAND>");
             eprintln!("Commands: check, translate, explain");
@@ -119,6 +110,8 @@ pub fn run() -> ExitCode {
                         }
                         print!("{}", expl.format());
                     }
+                    println!("\n--- Full module ---\n");
+                    print!("{}", result.haskell_source);
                 }
                 ExitCode::SUCCESS
             }

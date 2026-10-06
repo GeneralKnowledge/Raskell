@@ -80,7 +80,22 @@ fn format_decl(decl: &HsDecl) -> String {
             }
             s
         }
-        HsDecl::TypeSig { name, ty } => format!("{name} :: {}", format_type(ty)),
+        HsDecl::TypeSig {
+            name,
+            constraints,
+            ty,
+        } => {
+            let ty_s = if constraints.is_empty() {
+                format_type(ty)
+            } else if let HsType::Constrained(_, inner) = ty {
+                let ctx = format_constraints(constraints);
+                format!("{ctx} => {}", format_type(inner))
+            } else {
+                let ctx = format_constraints(constraints);
+                format!("{ctx} => {}", format_type(ty))
+            };
+            format!("{name} :: {ty_s}")
+        }
         HsDecl::FunBind { name, equations } => {
             let eqs: Vec<String> = equations
                 .iter()
@@ -102,6 +117,45 @@ fn format_decl(decl: &HsDecl) -> String {
             eqs.join("\n")
         }
         HsDecl::PatBind { name, body } => format!("{name} = {}", format_exp(body, 0)),
+        HsDecl::Class {
+            name,
+            type_var,
+            methods,
+        } => {
+            let mut s = format!("class {name} {type_var} where");
+            for (m, ty) in methods {
+                s.push_str(&format!("\n  {m} :: {}", format_type(ty)));
+            }
+            s
+        }
+        HsDecl::Instance { class, ty, methods } => {
+            let mut s = format!("instance {class} {} where", format_type(ty));
+            for (m, pats, body) in methods {
+                let ps = pats
+                    .iter()
+                    .map(|p| format_pat(p, true))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if ps.is_empty() {
+                    s.push_str(&format!("\n  {m} = {}", format_exp(body, 0)));
+                } else {
+                    s.push_str(&format!("\n  {m} {ps} = {}", format_exp(body, 0)));
+                }
+            }
+            s
+        }
+    }
+}
+
+fn format_constraints(constraints: &[(String, String)]) -> String {
+    let parts: Vec<String> = constraints
+        .iter()
+        .map(|(c, v)| format!("{c} {v}"))
+        .collect();
+    if parts.len() == 1 {
+        parts[0].clone()
+    } else {
+        format!("({})", parts.join(", "))
     }
 }
 
@@ -123,6 +177,9 @@ fn format_ctor(c: &HsCtor) -> String {
 fn format_type(ty: &HsType) -> String {
     match ty {
         HsType::Fun(a, b) => format!("{} -> {}", format_type_atom(a), format_type(b)),
+        HsType::Constrained(cs, inner) => {
+            format!("{} => {}", format_constraints(cs), format_type(inner))
+        }
         other => format_type_atom(other),
     }
 }
@@ -132,7 +189,7 @@ fn format_type_atom(ty: &HsType) -> String {
         HsType::Var(v) => v.clone(),
         HsType::Con(c) => c.clone(),
         HsType::App(f, a) => format!("{} {}", format_type_atom(f), format_type_atom(a)),
-        HsType::Fun(_, _) => format!("({})", format_type(ty)),
+        HsType::Fun(_, _) | HsType::Constrained(_, _) => format!("({})", format_type(ty)),
         HsType::Tuple(ts) => {
             let inner: Vec<_> = ts.iter().map(format_type).collect();
             format!("({})", inner.join(", "))

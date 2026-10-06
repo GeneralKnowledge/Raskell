@@ -2,7 +2,7 @@
 
 **Write Rust. Get Haskell.**
 
-Raskell is a Rust-to-Haskell transpiler. It accepts a deliberately supported subset of Rust and translates programs into idiomatic, compilable Haskell.
+Raskell is a Rust-to-Haskell transpiler. It accepts a deliberately supported subset of Rust and translates programs into idiomatic, compilable Haskell — aimed at developers who know Rust and need Haskell output without learning Haskell first.
 
 Raskell is **not** a Rust compiler and does **not** translate Rust into Rust. Rust is the source language; Haskell is the target language.
 
@@ -38,6 +38,18 @@ becomes:
 sumPositive :: [Int] -> Int
 sumPositive values = sum (filter (\x -> x > 0) values)
 ```
+
+## For Rust developers (start here)
+
+You do not need to know Haskell to use Raskell productively:
+
+1. Write a small function in the supported Rust subset.
+2. `raskell check` — fail fast on unsupported constructs.
+3. `raskell explain` — see detected patterns and the generated module.
+4. `raskell translate -o Module.hs` — emit Haskell.
+5. `ghc -c Module.hs` or `runghc Module.hs`.
+
+Full walkthrough, cookbook, and stdlib mappings: **[docs/rust-developer-guide.md](docs/rust-developer-guide.md)**.
 
 ## Architecture
 
@@ -77,7 +89,7 @@ cargo build --release
 # Translate to a file
 ./target/release/raskell translate examples/mutation.rs -o Mutation.hs
 
-# Explain translation decisions
+# Explain translation decisions (+ full generated module)
 ./target/release/raskell explain examples/mutation.rs
 
 ./target/release/raskell --version
@@ -95,10 +107,14 @@ See `examples/`:
 | `hello.rs` | `println!` → `putStrLn` |
 | `fibonacci.rs` / `factorial.rs` | Recursion |
 | `mutation.rs` | Scalar mutation & accumulator → arithmetic / `filter`+`sum` |
-| `iterators.rs` | `.iter().filter().map().collect()` → `map` / `filter` |
+| `iterators.rs` / `more_iterators.rs` | Iterator chains → Prelude (`map`, `filter`, `chain`, `take`, …) |
 | `collection_processing.rs` | `for` + `push` → `map` |
 | `structs.rs` / `enums.rs` | Records & ADTs |
 | `option.rs` / `result.rs` | `Option`→`Maybe`, `Result`→`Either` |
+| `try_operator.rs` | `?` → `Either`/`Maybe` do-notation |
+| `traits.rs` / `generics.rs` | Traits → type classes; generics → polymorphism |
+| `while_loop.rs` | `while` + mutable state → tail-recursive `go` |
+| `stdlib_helpers.rs` | Everyday method mappings (`is_empty`, `contains`, …) |
 | `pattern_matching.rs` | `match` → `case` |
 | `state_machine.rs` | Enum state transitions |
 | `io.rs` | Basic IO |
@@ -108,22 +124,25 @@ See `examples/`:
 Growing over time. Currently includes:
 
 - Functions, parameters, return values, recursion
+- Generics on functions / data; trait bounds → Haskell constraints
+- Traits and `impl` blocks → type classes / instances
 - `let` / `let mut` (with mutation→pure rewrites where recognised)
+- `while` loops with recognised accumulator / counter patterns → `go`
 - Primitive types, tuples, structs, enums
-- `Option` / `Result`
+- `Option` / `Result`, including `?` error propagation → do-notation
 - `Vec`, array literals, `vec!`
 - Strings, arithmetic, comparisons, booleans
 - `if`, `match`, `for` (recognised patterns), closures
-- Iterator chains: `iter` / `map` / `filter` / `collect` / `sum` / …
+- Iterator chains: `iter` / `map` / `filter` / `collect` / `sum` / `chain` / `take` / `zip` / `enumerate` / …
+- Common methods: `len`, `is_empty`, `contains`, `starts_with`, `is_some` / `is_ok`, `unwrap_or`, `abs`, …
 - References / borrowing erased when semantics are clear
-- Basic IO via `println!` / `print!`
+- Basic IO via `println!` / `print!` / `format!`
 
 ## Unsupported (rejected with diagnostics)
 
 Unsupported constructs must **not** silently produce wrong Haskell. Examples:
 
 - `unsafe`, raw FFI / `extern`
-- Traits / `impl` blocks (roadmap)
 - `async` / `await` (roadmap)
 - Arbitrary macros (only `vec!`, `println!`, `print!`, `format!`)
 - Ambiguous mutation / ownership patterns the analyser cannot prove sound
@@ -151,10 +170,14 @@ The Haskell backend seeks idiomatic output:
 | `Result<T, E>` | `Either e a` (note parameter order) |
 | `struct` | `data` with record fields |
 | `enum` | algebraic data type |
+| `trait` / `impl` | `class` / `instance` |
+| `T: Trait` bounds | `Trait t => …` |
+| `?` in fallible fn | `do` / `<-` |
 | mutable accumulator + filter | `sum` / `filter` |
 | `for` + `push` | `map` |
+| `while` + counters | tail-recursive `go` |
 | scalar `+=` / `*=` chain | nested arithmetic |
-| iterator chain | `map` / `filter` / `foldl` / … |
+| iterator chain | `map` / `filter` / `foldl` / `++` / … |
 
 Haskell is **not** restricted to Rust-shaped features. Generated code may use ADTs, higher-order functions, `Maybe`/`Either`, `IO`, and the Prelude freely.
 
@@ -173,6 +196,7 @@ The suite covers:
 - **Parser** — functions, structs, enums, closures, loops, …
 - **Semantic** — acceptance & rejection
 - **Translation** — idiomatic output (`Option`→`Maybe`, iterators→`map`, …)
+- **Gaps** — generics, traits, `?`, while, stdlib helpers
 - **Compile** — generated Haskell typechecks/compiles with GHC
 - **Differential** — Rust and Haskell programs compared on the same inputs
 - **Invalid** — unsupported constructs produce clean diagnostics
@@ -187,11 +211,7 @@ The suite covers:
 
 ## Roadmap
 
-- Richer ownership / borrow-aware transforms
-- Traits → type classes; generics → Haskell polymorphism
-- Async → IO / concurrency; channels → STM
-- Broader stdlib mapping, property-based & fuzz testing
-- Source maps, comment preservation, LSP
+See [docs/roadmap.md](docs/roadmap.md). Near-term themes: richer ownership transforms, async subset, broader stdlib, property-based differential testing, source maps / LSP.
 
 ## License
 

@@ -30,6 +30,8 @@ pub enum Item {
     Enum(EnumDef),
     Const(ConstDef),
     Use(UseItem),
+    Trait(TraitDef),
+    Impl(ImplBlock),
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +55,10 @@ pub struct Function {
     pub return_type: Option<Type>,
     pub body: Block,
     pub is_pub: bool,
+    /// Type parameter names, e.g. `T`, `E`.
     pub generics: Vec<String>,
+    /// Trait bounds: `(type_param, [Trait, ...])`.
+    pub bounds: Vec<(String, Vec<String>)>,
     pub span: Span,
 }
 
@@ -63,6 +68,38 @@ pub struct Param {
     pub ty: Type,
     pub is_mut: bool,
     pub by_ref: bool,
+    /// True when this is a `self` / `&self` / `&mut self` receiver.
+    pub is_self: bool,
+    pub span: Span,
+}
+
+/// `trait Foo { fn bar(&self) -> …; }`
+#[derive(Debug, Clone)]
+pub struct TraitDef {
+    pub name: String,
+    pub generics: Vec<String>,
+    pub methods: Vec<TraitMethod>,
+    pub is_pub: bool,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitMethod {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub return_type: Option<Type>,
+    pub generics: Vec<String>,
+    pub bounds: Vec<(String, Vec<String>)>,
+    pub default_body: Option<Block>,
+    pub span: Span,
+}
+
+/// `impl Foo { … }` or `impl Trait for Type { … }`
+#[derive(Debug, Clone)]
+pub struct ImplBlock {
+    pub trait_name: Option<String>,
+    pub for_type: Type,
+    pub methods: Vec<Function>,
     pub span: Span,
 }
 
@@ -371,7 +408,8 @@ pub enum UnOp {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
-    Named(String),
+    /// Named type, optionally applied to type arguments (`Foo`, `Foo<T, U>`).
+    Named(String, Vec<Type>),
     Path(Vec<String>),
     Ref {
         is_mut: bool,
@@ -386,7 +424,9 @@ pub enum Type {
         params: Vec<Type>,
         ret: Box<Type>,
     },
+    /// A type parameter such as `T`.
     Generic(String),
+    SelfType,
     Infer,
     Unit,
 }
@@ -395,7 +435,8 @@ impl Type {
     pub fn named(name: &str) -> Self {
         match name {
             "()" => Type::Unit,
-            _ => Type::Named(name.to_string()),
+            "Self" => Type::SelfType,
+            _ => Type::Named(name.to_string(), vec![]),
         }
     }
 }

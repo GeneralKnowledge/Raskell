@@ -23,6 +23,22 @@ pub fn to_ir(analyzed: &AnalyzedProgram) -> anyhow::Result<(Module, Diagnostics)
         let _ = name;
     }
 
+    // Traits → type classes
+    for (name, t) in &analyzed.traits {
+        module.decls.push(ir::Decl::Class(trait_to_class(t)));
+        let _ = name;
+    }
+
+    // Trait impls → instances (inherent impls already expanded into functions)
+    for impl_block in &analyzed.impls {
+        if let Some(trait_name) = &impl_block.trait_name {
+            let (inst, mut idiags) =
+                impl_to_instance(impl_block, trait_name, &analyzed.program.filename);
+            diags.append(std::mem::take(&mut idiags));
+            module.decls.push(ir::Decl::Instance(inst));
+        }
+    }
+
     // Constants
     for item in &analyzed.program.items {
         if let Item::Const(c) = item {
@@ -37,9 +53,9 @@ pub fn to_ir(analyzed: &AnalyzedProgram) -> anyhow::Result<(Module, Diagnostics)
         }
     }
 
-    // Functions
+    // Functions (includes expanded inherent-impl methods)
     for f in analyzed.functions.values() {
-            let (func, notes, fdiags) = lower_function(f, &analyzed.program.filename);
+        let (func, notes, fdiags) = lower_function(f, &analyzed.program.filename);
         diags.append(fdiags);
         module.explanations.push(ir::TransNote {
             function: f.name.clone(),
@@ -129,38 +145,159 @@ fn enum_to_data(e: &EnumDef) -> ir::DataType {
 }
 
 pub fn lower_type(ty: &Type) -> Ty {
+    lower_type_in(ty, &[])
+}
+
+fn hs_var(name: &str) -> String {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) => format!("{}{}", c.to_lowercase(), chars.collect::<String>()),
+        None => "a".into(),
+    }
+}
+
+fn lower_type_in(ty: &Type, generics: &[String]) -> Ty {
     match ty {
         Type::Unit => Ty::Unit,
-        Type::Named(n) => match n.as_str() {
-            "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => Ty::Int,
-            "u8" | "u16" | "u32" => Ty::Word32,
-            "u64" | "u128" | "usize" => Ty::Word64,
-            "f32" => Ty::Float,
-            "f64" => Ty::Double,
-            "bool" => Ty::Bool,
-            "char" => Ty::Char,
-            "String" | "str" => Ty::String,
-            other => Ty::Named(other.to_string(), vec![]),
-        },
+        Type::SelfType => Ty::Var("a".into()),
+        Type::Generic(g) => Ty::Var(hs_var(g)),
+        Type::Named(n, args) => {
+            if generics.iter().any(|g| g == n) {
+                return Ty::Var(hs_var(n));
+            }
+            match n.as_str() {
+                "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => Ty::Int,
+                "u8" | "u16" | "u32" => Ty::Word32,
+                "u64" | "u128" | "usize" => Ty::Word64,
+                "f32" => Ty::Float,
+                "f64" => Ty::Double,
+                "bool" => Ty::Bool,
+                "char" => Ty::Char,
+                "String" | "str" => Ty::String,
+                other => Ty::Named(
+                    other.to_string(),
+                    args.iter().map(|a| lower_type_in(a, generics)).collect(),
+                ),
+            }
+        }
         Type::Path(parts) => {
             let n = parts.last().map(|s| s.as_str()).unwrap_or("()");
-            lower_type(&Type::Named(n.to_string()))
+            lower_type_in(&Type::Named(n.to_string(), vec![]), generics)
         }
-        Type::Ref { inner, .. } => lower_type(inner), // refs erased
-        Type::Tuple(ts) => Ty::Tuple(ts.iter().map(lower_type).collect()),
-        Type::Array(t) | Type::Vec(t) => Ty::List(Box::new(lower_type(t))),
-        Type::Option(t) => Ty::Maybe(Box::new(lower_type(t))),
-        Type::Result(ok, err) => {
-            // Rust Result<T,E> → Haskell Either e a
-            Ty::Either(Box::new(lower_type(err)), Box::new(lower_type(ok)))
-        }
-        Type::Fun { params, ret } => Ty::Fun(
-            params.iter().map(lower_type).collect(),
-            Box::new(lower_type(ret)),
+        Type::Ref { inner, .. } => lower_type_in(inner, generics),
+        Type::Tuple(ts) => Ty::Tuple(ts.iter().map(|t| lower_type_in(t, generics)).collect()),
+        Type::Array(t) | Type::Vec(t) => Ty::List(Box::new(lower_type_in(t, generics))),
+        Type::Option(t) => Ty::Maybe(Box::new(lower_type_in(t, generics))),
+        Type::Result(ok, err) => Ty::Either(
+            Box::new(lower_type_in(err, generics)),
+            Box::new(lower_type_in(ok, generics)),
         ),
-        Type::Generic(g) => Ty::Var(g.clone()),
+        Type::Fun { params, ret } => Ty::Fun(
+            params
+                .iter()
+                .map(|t| lower_type_in(t, generics))
+                .collect(),
+            Box::new(lower_type_in(ret, generics)),
+        ),
         Type::Infer => Ty::Var("a".into()),
     }
+}
+
+fn is_self_ty(ty: &Type) -> bool {
+    match ty {
+        Type::SelfType => true,
+        Type::Ref { inner, .. } => is_self_ty(inner),
+        _ => false,
+    }
+}
+
+fn trait_to_class(t: &TraitDef) -> ir::Class {
+    let type_var = "a".to_string();
+    let methods = t
+        .methods
+        .iter()
+        .map(|m| {
+            let params: Vec<Ty> = m
+                .params
+                .iter()
+                .map(|p| {
+                    if p.is_self || is_self_ty(&p.ty) {
+                        Ty::Var(type_var.clone())
+                    } else {
+                        lower_type_in(&p.ty, &t.generics)
+                    }
+                })
+                .collect();
+            let ret = m
+                .return_type
+                .as_ref()
+                .map(|rt| {
+                    if is_self_ty(rt) {
+                        Ty::Var(type_var.clone())
+                    } else {
+                        lower_type_in(rt, &t.generics)
+                    }
+                })
+                .unwrap_or(Ty::Unit);
+            let ty = if params.is_empty() {
+                ret
+            } else {
+                Ty::Fun(params, Box::new(ret))
+            };
+            ir::ClassMethod {
+                name: camel(&m.name),
+                ty,
+            }
+        })
+        .collect();
+    ir::Class {
+        name: t.name.clone(),
+        type_var,
+        methods,
+    }
+}
+
+fn impl_to_instance(
+    impl_block: &ImplBlock,
+    trait_name: &str,
+    filename: &str,
+) -> (ir::Instance, Diagnostics) {
+    let mut diags = Diagnostics::new();
+    let self_ty = lower_type(&impl_block.for_type);
+    let mut methods = Vec::new();
+    for m in &impl_block.methods {
+        let mut f = m.clone();
+        // Rewrite self params to concrete type for lowering
+        f.params = f
+            .params
+            .iter()
+            .map(|p| {
+                if p.is_self {
+                    Param {
+                        name: "self_".into(),
+                        ty: impl_block.for_type.clone(),
+                        is_mut: p.is_mut,
+                        by_ref: false,
+                        is_self: false,
+                        span: p.span,
+                    }
+                } else {
+                    p.clone()
+                }
+            })
+            .collect();
+        let (func, _notes, fdiags) = lower_function(&f, filename);
+        diags.append(fdiags);
+        methods.push(func);
+    }
+    (
+        ir::Instance {
+            class: trait_name.to_string(),
+            ty: self_ty,
+            methods,
+        },
+        diags,
+    )
 }
 
 #[derive(Debug, Clone, Default)]
@@ -192,21 +329,47 @@ fn lower_function(f: &Function, filename: &str) -> (ir::Func, TransNotes, Diagno
     let mut ctx = LowerCtx::new(filename);
     let mut notes = TransNotes::default();
 
+    let type_vars: Vec<String> = f.generics.iter().map(|g| hs_var(g)).collect();
+    let constraints: Vec<(String, String)> = f
+        .bounds
+        .iter()
+        .flat_map(|(param, traits)| {
+            let v = hs_var(param);
+            traits
+                .iter()
+                .map(|t| (t.clone(), v.clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
     let params: Vec<(String, Ty)> = f
         .params
         .iter()
         .map(|p| {
-            // Strip refs from param types for Haskell
-            let ty = lower_type(&p.ty);
-            (camel(&p.name), ty)
+            let name = if p.name == "self" || p.name == "self_" {
+                "self_".to_string()
+            } else {
+                camel(&p.name)
+            };
+            let ty = lower_type_in(&p.ty, &f.generics);
+            (name, ty)
         })
         .collect();
 
     let return_ty = f
         .return_type
         .as_ref()
-        .map(lower_type)
+        .map(|t| lower_type_in(t, &f.generics))
         .unwrap_or(Ty::Unit);
+
+    if !f.generics.is_empty() {
+        notes.detected.push("generics".into());
+        notes.translation.push("Haskell type variables".into());
+    }
+    if !constraints.is_empty() {
+        notes.detected.push("trait bounds".into());
+        notes.translation.push("Haskell type-class constraints".into());
+    }
 
     // Try pattern recognition on the whole body first
     if let Some(body) = try_pattern_body(&f.body, &mut notes, &mut ctx) {
@@ -216,9 +379,34 @@ fn lower_function(f: &Function, filename: &str) -> (ir::Func, TransNotes, Diagno
             return_ty,
             body,
             notes: notes.detected.clone(),
+            type_vars,
+            constraints,
         };
         let diags = std::mem::take(&mut ctx.diags);
         return (func, notes, diags);
+    }
+
+    // `?` error propagation → do-notation
+    if block_has_try(&f.body) {
+        notes.detected.push("`?` error propagation".into());
+        notes.translation.push("Either/Maybe do-notation".into());
+        if let Some(body) = lower_try_block(&f.body, &mut ctx) {
+            notes.summary = format!("{} = do …", camel(&f.name));
+            let diags = std::mem::take(&mut ctx.diags);
+            return (
+                ir::Func {
+                    name: camel(&f.name),
+                    params,
+                    return_ty,
+                    body,
+                    notes: notes.detected.clone(),
+                    type_vars,
+                    constraints,
+                },
+                notes,
+                diags,
+            );
+        }
     }
 
     let body = lower_block(&f.body, &mut ctx, &mut notes);
@@ -246,10 +434,124 @@ fn lower_function(f: &Function, filename: &str) -> (ir::Func, TransNotes, Diagno
             return_ty,
             body,
             notes: notes.detected.clone(),
+            type_vars,
+            constraints,
         },
         notes,
         diags,
     )
+}
+
+fn block_has_try(block: &Block) -> bool {
+    block.stmts.iter().any(|s| match s {
+        Stmt::Let {
+            value: Some(e), ..
+        }
+        | Stmt::Expr(e)
+        | Stmt::Return(Some(e), _) => expr_has_try(e),
+        _ => false,
+    }) || block
+        .expr
+        .as_ref()
+        .is_some_and(|e| expr_has_try(e))
+}
+
+fn expr_has_try(expr: &Expr) -> bool {
+    match expr {
+        Expr::Try(_, _) => true,
+        Expr::Call { func, args, .. } => {
+            expr_has_try(func) || args.iter().any(expr_has_try)
+        }
+        Expr::MethodCall { receiver, args, .. } => {
+            expr_has_try(receiver) || args.iter().any(expr_has_try)
+        }
+        Expr::Binary { left, right, .. } | Expr::Assign { target: left, value: right, .. } => {
+            expr_has_try(left) || expr_has_try(right)
+        }
+        Expr::If {
+            cond,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            expr_has_try(cond)
+                || block_has_try(then_branch)
+                || else_branch.as_ref().is_some_and(|e| expr_has_try(e))
+        }
+        Expr::Block(b) => block_has_try(b),
+        Expr::Unary { expr, .. }
+        | Expr::Deref { expr, .. }
+        | Expr::Reference { expr, .. }
+        | Expr::Field { base: expr, .. } => expr_has_try(expr),
+        _ => false,
+    }
+}
+
+/// Lower a block that uses `?` into `do` notation.
+fn lower_try_block(block: &Block, ctx: &mut LowerCtx) -> Option<ir::Exp> {
+    let mut stmts = Vec::new();
+    for stmt in &block.stmts {
+        match stmt {
+            Stmt::Let {
+                name,
+                value: Some(Expr::Try(inner, _)),
+                ..
+            } => {
+                stmts.push(ir::DoStmt::Bind {
+                    name: camel(name),
+                    exp: lower_expr(inner, ctx),
+                });
+            }
+            Stmt::Let {
+                name,
+                value: Some(v),
+                ..
+            } => {
+                stmts.push(ir::DoStmt::Let {
+                    name: camel(name),
+                    exp: lower_expr(v, ctx),
+                });
+            }
+            Stmt::Expr(Expr::Try(inner, _)) => {
+                stmts.push(ir::DoStmt::Bind {
+                    name: "_".into(),
+                    exp: lower_expr(inner, ctx),
+                });
+            }
+            Stmt::Expr(e) => {
+                stmts.push(ir::DoStmt::Exp(lower_expr(e, ctx)));
+            }
+            Stmt::Return(Some(e), _) => {
+                let last = unwrap_ok_some(e, ctx);
+                return Some(ir::Exp::Do(stmts, Box::new(last)));
+            }
+            _ => return None,
+        }
+    }
+    let last = match &block.expr {
+        Some(e) => unwrap_ok_some(e, ctx),
+        None => ir::Exp::Lit(ir::Lit::Unit),
+    };
+    Some(ir::Exp::Do(stmts, Box::new(last)))
+}
+
+fn unwrap_ok_some(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
+    match expr {
+        Expr::Call { func, args, .. } => match func.as_ref() {
+            Expr::Path(p, _) if p == "Ok" || p.ends_with("::Ok") || p == "Some" || p.ends_with("::Some") => {
+                if let Some(a) = args.first() {
+                    return ir::Exp::Pure(Box::new(lower_expr(a, ctx)));
+                }
+            }
+            Expr::Path(p, _) if p == "Err" || p.ends_with("::Err") || p == "None" || p.ends_with("::None") => {
+                return lower_expr(expr, ctx);
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+    // Bare value in a Result-returning function — wrap with return
+    ir::Exp::Pure(Box::new(lower_expr(expr, ctx)))
 }
 
 fn try_pattern_body(
@@ -343,7 +645,57 @@ fn try_pattern_body(
         return Some(e);
     }
 
+    if let Some(while_exp) = patterns::detect_while_accum(block) {
+        notes.detected.push("while-loop accumulator".into());
+        notes.translation.push("tail-recursive go helper".into());
+        notes.summary = "go n acc = if … then go … else acc".into();
+        return Some(lower_while_accum(while_exp, ctx));
+    }
+
     None
+}
+
+fn lower_while_accum(w: patterns::WhileAccum, ctx: &mut LowerCtx) -> ir::Exp {
+    // go n acc = if cond then go n' acc' else acc
+    let n0 = lower_expr(&w.counter_init, ctx);
+    let a0 = lower_expr(&w.acc_init, ctx);
+    let cond = rename_var(
+        &rename_var(&lower_expr(&w.cond, ctx), &camel(&w.counter), "n"),
+        &camel(&w.acc),
+        "acc",
+    );
+    let mut n_next = ir::Exp::var("n");
+    let mut a_next = ir::Exp::var("acc");
+    for (target, op, val) in &w.updates {
+        let v = rename_var(
+            &rename_var(&lower_expr(val, ctx), &camel(&w.counter), "n"),
+            &camel(&w.acc),
+            "acc",
+        );
+        let updated = ir::Exp::BinOp(lower_binop(*op), Box::new(ir::Exp::var(
+            if target == &w.counter { "n" } else { "acc" }
+        )), Box::new(v));
+        if target == &w.counter {
+            n_next = updated;
+        } else {
+            a_next = updated;
+        }
+    }
+    let go_body = ir::Exp::If(
+        Box::new(cond),
+        Box::new(ir::Exp::app(
+            ir::Exp::var("go"),
+            vec![n_next, a_next],
+        )),
+        Box::new(ir::Exp::var("acc")),
+    );
+    ir::Exp::Let(
+        vec![ir::Binding {
+            name: "go".into(),
+            value: ir::Exp::Lam(vec!["n".into(), "acc".into()], Box::new(go_body)),
+        }],
+        Box::new(ir::Exp::app(ir::Exp::var("go"), vec![n0, a0])),
+    )
 }
 
 fn rename_var(exp: &ir::Exp, from: &str, to: &str) -> ir::Exp {
@@ -585,6 +937,16 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
             vec![lower_expr(base, ctx), lower_expr(index, ctx)],
         ),
         Expr::Call { func, args, .. } => {
+            // String::from(x) / From::from(x) → x (Haskell String is already the value)
+            if let Expr::Path(p, _) = func.as_ref() {
+                if p.ends_with("::from") || p == "from" {
+                    return args
+                        .first()
+                        .map(|a| lower_expr(a, ctx))
+                        .unwrap_or(ir::Exp::Lit(ir::Lit::Str(String::new())));
+                }
+            }
+
             let f = lower_expr(func, ctx);
             let as_ = args
                 .iter()
@@ -597,6 +959,7 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
                     "None" => ir::Exp::var("Nothing"),
                     "Ok" => ir::Exp::app(ir::Exp::var("Right"), as_),
                     "Err" => ir::Exp::app(ir::Exp::var("Left"), as_),
+                    "id" if as_.len() == 1 => as_[0].clone(),
                     "range" => {
                         // range a b → [a .. b-1]  (Rust is exclusive end)
                         if as_.len() == 2 {
@@ -615,11 +978,22 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
                             ir::Exp::App(Box::new(f), as_)
                         }
                     }
-                    "replicate" => ir::Exp::app(ir::Exp::var("replicate"), as_),
-                    "println" | "print" => {
-                        // IO: putStrLn
-                        ir::Exp::app(ir::Exp::var("putStrLn"), as_)
+                    "replicate" => {
+                        // Rust [expr; n] was converted as replicate(n, expr);
+                        // Haskell replicate :: Int -> a -> [a]
+                        ir::Exp::app(ir::Exp::var("replicate"), as_)
                     }
+                    "putStrLn" | "println" => ir::Exp::app(ir::Exp::var("putStrLn"), as_),
+                    "putStr" | "print" => ir::Exp::app(ir::Exp::var("putStr"), as_),
+                    "show" => ir::Exp::app(ir::Exp::var("show"), as_),
+                    "strAppend" if as_.len() == 2 => ir::Exp::BinOp(
+                        ir::BinOp::Append,
+                        Box::new(as_[0].clone()),
+                        Box::new(as_[1].clone()),
+                    ),
+                    "abs" => ir::Exp::app(ir::Exp::var("abs"), as_),
+                    "min" if as_.len() == 2 => ir::Exp::app(ir::Exp::var("min"), as_),
+                    "max" if as_.len() == 2 => ir::Exp::app(ir::Exp::var("max"), as_),
                     _ => ir::Exp::App(Box::new(f), as_),
                 },
                 _ => ir::Exp::App(Box::new(f), as_),
@@ -631,17 +1005,75 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
             args,
             span,
         } => match method.as_str() {
-            "len" | "length" => ir::Exp::app(ir::Exp::var("length"), vec![lower_expr(receiver, ctx)]),
-            "is_empty" => ir::Exp::app(
-                ir::Exp::var("null"),
-                vec![lower_expr(receiver, ctx)],
-            ),
-            "clone" | "to_owned" | "to_string" => lower_expr(receiver, ctx),
-            "as_str" => lower_expr(receiver, ctx),
-            "unwrap" => ir::Exp::app(
-                ir::Exp::var("fromJust"),
-                vec![lower_expr(receiver, ctx)],
-            ),
+            "len" | "length" => {
+                ir::Exp::app(ir::Exp::var("length"), vec![lower_expr(receiver, ctx)])
+            }
+            "is_empty" => ir::Exp::app(ir::Exp::var("null"), vec![lower_expr(receiver, ctx)]),
+            "clone" | "to_owned" | "to_string" | "as_str" | "into" | "to_vec" => {
+                lower_expr(receiver, ctx)
+            }
+            "chars" => lower_expr(receiver, ctx), // String ≅ [Char]
+            "lines" => ir::Exp::app(ir::Exp::var("lines"), vec![lower_expr(receiver, ctx)]),
+            "trim" => {
+                // words then unwords approximates whitespace trim for simple cases
+                ir::Exp::app(
+                    ir::Exp::var("unwords"),
+                    vec![ir::Exp::app(
+                        ir::Exp::var("words"),
+                        vec![lower_expr(receiver, ctx)],
+                    )],
+                )
+            }
+            "contains" => {
+                let needle = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::Lit(ir::Lit::Str(String::new())));
+                ir::Exp::app(
+                    ir::Exp::var("isInfixOf"),
+                    vec![needle, lower_expr(receiver, ctx)],
+                )
+            }
+            "starts_with" => {
+                let prefix = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::Lit(ir::Lit::Str(String::new())));
+                ir::Exp::app(
+                    ir::Exp::var("isPrefixOf"),
+                    vec![prefix, lower_expr(receiver, ctx)],
+                )
+            }
+            "ends_with" => {
+                let suffix = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::Lit(ir::Lit::Str(String::new())));
+                ir::Exp::app(
+                    ir::Exp::var("isSuffixOf"),
+                    vec![suffix, lower_expr(receiver, ctx)],
+                )
+            }
+            "push_str" => {
+                let v = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::Lit(ir::Lit::Str(String::new())));
+                ir::Exp::BinOp(
+                    ir::BinOp::Append,
+                    Box::new(lower_expr(receiver, ctx)),
+                    Box::new(v),
+                )
+            }
+            "is_some" => ir::Exp::app(ir::Exp::var("isJust"), vec![lower_expr(receiver, ctx)]),
+            "is_none" => {
+                ir::Exp::app(ir::Exp::var("isNothing"), vec![lower_expr(receiver, ctx)])
+            }
+            "is_ok" => ir::Exp::app(ir::Exp::var("isRight"), vec![lower_expr(receiver, ctx)]),
+            "is_err" => ir::Exp::app(ir::Exp::var("isLeft"), vec![lower_expr(receiver, ctx)]),
+            "unwrap" => {
+                ir::Exp::app(ir::Exp::var("fromJust"), vec![lower_expr(receiver, ctx)])
+            }
             "unwrap_or" => {
                 let default = args
                     .first()
@@ -652,8 +1084,90 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
                     vec![default, lower_expr(receiver, ctx)],
                 )
             }
+            "unwrap_or_else" => {
+                let f = args
+                    .first()
+                    .map(|a| lower_closure_or_expr(a, ctx))
+                    .unwrap_or(ir::Exp::var("id"));
+                // fromMaybe (f ()) m  — approximates lazy default for ()-taking closures
+                ir::Exp::app(
+                    ir::Exp::var("fromMaybe"),
+                    vec![
+                        ir::Exp::app(f, vec![ir::Exp::Lit(ir::Lit::Unit)]),
+                        lower_expr(receiver, ctx),
+                    ],
+                )
+            }
+            "ok" => {
+                // Result::ok → Either → Maybe via either (const Nothing) Just
+                ir::Exp::app(
+                    ir::Exp::var("either"),
+                    vec![
+                        ir::Exp::app(ir::Exp::var("const"), vec![ir::Exp::var("Nothing")]),
+                        ir::Exp::var("Just"),
+                        lower_expr(receiver, ctx),
+                    ],
+                )
+            }
+            "ok_or" => {
+                let err = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::Lit(ir::Lit::Unit));
+                ir::Exp::app(
+                    ir::Exp::var("maybe"),
+                    vec![
+                        ir::Exp::app(ir::Exp::var("Left"), vec![err]),
+                        ir::Exp::var("Right"),
+                        lower_expr(receiver, ctx),
+                    ],
+                )
+            }
+            "and_then" => {
+                let f = args
+                    .first()
+                    .map(|a| lower_closure_or_expr(a, ctx))
+                    .unwrap_or(ir::Exp::var("return"));
+                ir::Exp::app(
+                    ir::Exp::var("(>>=)"),
+                    vec![lower_expr(receiver, ctx), f],
+                )
+            }
+            "or_else" => {
+                let f = args
+                    .first()
+                    .map(|a| lower_closure_or_expr(a, ctx))
+                    .unwrap_or(ir::Exp::var("return"));
+                // For Either: either f Right
+                ir::Exp::app(
+                    ir::Exp::var("either"),
+                    vec![f, ir::Exp::var("Right"), lower_expr(receiver, ctx)],
+                )
+            }
+            "map_err" => {
+                // either (Left . f) Right e
+                let f = args
+                    .first()
+                    .map(|a| lower_closure_or_expr(a, ctx))
+                    .unwrap_or(ir::Exp::var("id"));
+                let left_f = ir::Exp::app(
+                    ir::Exp::var("(.)"),
+                    vec![ir::Exp::var("Left"), f],
+                );
+                ir::Exp::app(
+                    ir::Exp::var("either"),
+                    vec![left_f, ir::Exp::var("Right"), lower_expr(receiver, ctx)],
+                )
+            }
+            "abs" => ir::Exp::app(ir::Exp::var("abs"), vec![lower_expr(receiver, ctx)]),
+            "pow" => {
+                let n = args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::int(1));
+                ir::Exp::app(ir::Exp::var("(^)"), vec![lower_expr(receiver, ctx), n])
+            }
             "push" => {
-                // x.push(v) as expression is unusual; treat as snoc
                 let v = args
                     .first()
                     .map(|a| lower_expr(a, ctx))
@@ -664,21 +1178,16 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
                     Box::new(ir::Exp::List(vec![v])),
                 )
             }
-            "new" => {
-                // Type::new() — Vec::new already handled as path call
-                ir::Exp::List(vec![])
+            "new" => ir::Exp::List(vec![]),
+            "next" => {
+                ir::Exp::app(ir::Exp::var("listToMaybe"), vec![lower_expr(receiver, ctx)])
             }
             other => {
-                ctx.diags.push(
-                    Diagnostic::unsupported(
-                        &format!("method `.{other}`"),
-                        &ctx.filename,
-                        span.line,
-                        span.column,
-                    )
-                    .note("Map this method to a Haskell equivalent or rewrite the source."),
-                );
-                ir::Exp::Error(format!("method {other}"))
+                // Typeclass / inherent methods → function application (greet x)
+                let mut call_args = vec![lower_expr(receiver, ctx)];
+                call_args.extend(args.iter().map(|a| lower_expr(a, ctx)));
+                let _ = span;
+                ir::Exp::app(ir::Exp::var(camel(other)), call_args)
             }
         },
         Expr::Binary {
@@ -806,21 +1315,16 @@ fn lower_expr(expr: &Expr, ctx: &mut LowerCtx) -> ir::Exp {
         },
         Expr::Cast { expr, .. } => lower_expr(expr, ctx), // erase casts
         Expr::Try(e, span) => {
-            // e? → case e of Left err -> Left err; Right x -> ...  (needs monadic context)
-            // For now: translate as fromRight-ish or keep as app of a helper
+            // Standalone `?` outside a try-block rewrite — emit bind-friendly form.
             ctx.diags.push(
-                Diagnostic::warning("W0001", "`?` operator lowered as `either` projection")
-                    .at(&ctx.filename, span.line, span.column)
-                    .note("Prefer explicit match for clearer Either handling."),
+                Diagnostic::warning(
+                    "W0001",
+                    "`?` used outside a recognised fallible-function pattern",
+                )
+                .at(&ctx.filename, span.line, span.column)
+                .note("Raskell rewrites whole functions that use `?` into do-notation."),
             );
-            ir::Exp::app(
-                ir::Exp::var("either"),
-                vec![
-                    ir::Exp::var("Left"),
-                    ir::Exp::var("id"),
-                    lower_expr(e, ctx),
-                ],
-            )
+            lower_expr(e, ctx)
         }
         Expr::Unsupported { description, span } => {
             ctx.diags.push(Diagnostic::unsupported(
@@ -918,8 +1422,65 @@ fn lower_iterator_chain(
                     .first()
                     .map(|a| lower_closure_or_expr(a, ctx))
                     .unwrap_or(ir::Exp::var("Just"));
-                // mapMaybe in Haskell
                 exp = ir::Exp::app(ir::Exp::var("mapMaybe"), vec![f, exp]);
+            }
+            "enumerate" => {
+                exp = ir::Exp::app(ir::Exp::var("zip"), vec![
+                    ir::Exp::app(ir::Exp::var("enumFrom"), vec![ir::Exp::int(0)]),
+                    exp,
+                ]);
+            }
+            "zip" => {
+                let other = step
+                    .args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::List(vec![]));
+                exp = ir::Exp::app(ir::Exp::var("zip"), vec![exp, other]);
+            }
+            "chain" => {
+                let other = step
+                    .args
+                    .first()
+                    .map(|a| lower_expr(a, ctx))
+                    .unwrap_or(ir::Exp::List(vec![]));
+                exp = ir::Exp::BinOp(
+                    ir::BinOp::Append,
+                    Box::new(exp),
+                    Box::new(other),
+                );
+            }
+            "flatten" | "flat_map" => {
+                if step.method == "flat_map" {
+                    let f = step
+                        .args
+                        .first()
+                        .map(|a| lower_closure_or_expr(a, ctx))
+                        .unwrap_or(ir::Exp::var("id"));
+                    exp = ir::Exp::app(
+                        ir::Exp::var("concatMap"),
+                        vec![f, exp],
+                    );
+                } else {
+                    exp = ir::Exp::app(ir::Exp::var("concat"), vec![exp]);
+                }
+            }
+            "partition" => {
+                let p = step
+                    .args
+                    .first()
+                    .map(|a| lower_closure_or_expr(a, ctx))
+                    .unwrap_or(ir::Exp::var("const True"));
+                exp = ir::Exp::app(ir::Exp::var("partition"), vec![p, exp]);
+            }
+            "max" => {
+                exp = ir::Exp::app(ir::Exp::var("maximum"), vec![exp]);
+            }
+            "min" => {
+                exp = ir::Exp::app(ir::Exp::var("minimum"), vec![exp]);
+            }
+            "product" => {
+                exp = ir::Exp::app(ir::Exp::var("product"), vec![exp]);
             }
             other => {
                 ctx.diags.push(
@@ -1007,6 +1568,7 @@ fn lower_path(p: &str) -> ir::Exp {
             "Err" => ir::Exp::var("Left"),
             "true" => ir::Exp::Lit(ir::Lit::Bool(true)),
             "false" => ir::Exp::Lit(ir::Lit::Bool(false)),
+            "self" => ir::Exp::var("self_"),
             other => ir::Exp::var(camel(other)),
         }
     }
