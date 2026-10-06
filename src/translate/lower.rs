@@ -670,21 +670,18 @@ fn try_pattern_body(
         return Some(wrap_setup_lets(block, ir::Exp::Map(Box::new(f), Box::new(ir::Exp::var(col))), ctx));
     }
 
-    if let Some((_res, collection, cond, mapped)) = patterns::detect_filter_map_push(block) {
-        notes.detected.push("mutable Vec construction".into());
-        notes.detected.push("conditional push".into());
+    // Composable filter+map build (temps, continue-skips, if-push)
+    if let Some(m) = crate::translate::loop_analysis::analyze_filter_map_build(block) {
+        notes.detected.push("collection traversal".into());
+        notes.detected.push("conditional filtering".into());
+        notes.detected.push("element transformation".into());
         notes.translation.push("filter + map".into());
-        let skip = patterns::skip_setup_lets(block);
-        let pat = match &block.stmts[skip + 1] {
-            Stmt::Expr(Expr::For { pat, .. }) => pat.clone(),
-            _ => "x".into(),
-        };
-        let mut pred = lower_expr(&cond, ctx);
-        pred = rename_var(&pred, &camel(&pat), "x");
-        let mut mapped_l = lower_expr(&mapped, ctx);
-        mapped_l = rename_var(&mapped_l, &camel(&pat), "x");
-        let col = camel(&collection);
-        notes.summary = format!("map (...) (filter (...) {col})");
+        let mut pred = lower_expr(&m.predicate, ctx);
+        pred = rename_var(&pred, &camel(&m.pat), "x");
+        let mut mapped_l = lower_expr(&m.mapped, ctx);
+        mapped_l = rename_var(&mapped_l, &camel(&m.pat), "x");
+        let col = camel(&m.collection);
+        notes.summary = format!("map (…) (filter (…) {col})");
         return Some(wrap_setup_lets(
             block,
             ir::Exp::Map(
@@ -698,6 +695,58 @@ fn try_pattern_body(
         ));
     }
 
+    // Composable filtered fold: acc += f(x) under if / continue
+    if let Some(f) = crate::translate::loop_analysis::analyze_filtered_fold(block) {
+        notes.detected.push("collection traversal".into());
+        notes.detected.push("integer accumulation".into());
+        if f.predicate.is_some() {
+            notes.detected.push("conditional filtering".into());
+        }
+        let mut add_l = lower_expr(&f.addend, ctx);
+        add_l = rename_var(&add_l, &camel(&f.pat), "x");
+        let col = camel(&f.collection);
+        let mapped = if matches!(&f.addend, Expr::Path(n, _) if n == &f.pat) {
+            ir::Exp::var(col.clone())
+        } else {
+            notes.detected.push("element transformation".into());
+            ir::Exp::Map(
+                Box::new(ir::Exp::Lam(vec!["x".into()], Box::new(add_l))),
+                Box::new(ir::Exp::var(col.clone())),
+            )
+        };
+        let body = if let Some(pred_e) = &f.predicate {
+            let mut pred = lower_expr(pred_e, ctx);
+            pred = rename_var(&pred, &camel(&f.pat), "x");
+            // When we map then filter on the original value, filter first then map.
+            // Predicate mentions the loop pat (pre-map), so: sum (map f (filter p xs))
+            let filtered = ir::Exp::Filter(
+                Box::new(ir::Exp::Lam(vec!["x".into()], Box::new(pred))),
+                Box::new(ir::Exp::var(col.clone())),
+            );
+            let core = if matches!(&f.addend, Expr::Path(n, _) if n == &f.pat) {
+                filtered
+            } else {
+                let mut add2 = lower_expr(&f.addend, ctx);
+                add2 = rename_var(&add2, &camel(&f.pat), "x");
+                ir::Exp::Map(
+                    Box::new(ir::Exp::Lam(vec!["x".into()], Box::new(add2))),
+                    Box::new(filtered),
+                )
+            };
+            notes.translation.push("sum (filter … ∘ map …)".into());
+            notes.summary = format!("sum (map (…) (filter (…) {col}))");
+            ir::Exp::Sum(Box::new(core))
+        } else {
+            notes.translation.push("sum / map reduction".into());
+            notes.summary = format!("sum (…) {col}");
+            ir::Exp::Sum(Box::new(mapped))
+        };
+        // Only when init is 0 — otherwise fall through to generic fold later
+        if matches!(&f.acc_init, Expr::Lit(Lit::Int(0), _)) {
+            return Some(wrap_setup_lets(block, body, ctx));
+        }
+    }
+
     if let Some((_acc, _init, pat, collection, addend)) = patterns::detect_fold_add(block) {
         // Prefer sum (map f xs) when init is 0
         notes.detected.push("mutable accumulator".into());
@@ -706,7 +755,6 @@ fn try_pattern_body(
         let mut add_l = lower_expr(&addend, ctx);
         add_l = rename_var(&add_l, &camel(&pat), "x");
         let col = camel(&collection);
-        // If addend is just the loop var, plain sum already handled — still emit sum
         if matches!(&addend, Expr::Path(n, _) if n == &pat) {
             notes.summary = format!("sum {col}");
             return Some(wrap_setup_lets(block, ir::Exp::Sum(Box::new(ir::Exp::var(col))), ctx));
@@ -866,6 +914,61 @@ fn try_pattern_body(
         ));
     }
 
+    if let Some(find) = crate::translate::loop_analysis::analyze_early_find(block) {
+        notes.detected.push("collection traversal".into());
+        notes.detected.push("early return Some(…)".into());
+        notes.translation.push("find".into());
+        let mut pred = lower_expr(&find.predicate, ctx);
+        pred = rename_var(&pred, &camel(&find.pat), "x");
+        let mut val = lower_expr(&find.value, ctx);
+        val = rename_var(&val, &camel(&find.pat), "x");
+        let col = camel(&find.collection);
+        // If value is just the element, find pred; else mapMaybe-style via listToMaybe . filter
+        notes.summary = format!("find (…) {col}");
+        let find_exp = if matches!(&find.value, Expr::Path(n, _) if n == &find.pat)
+            || matches!(
+                &find.value,
+                Expr::Deref { expr, .. } if matches!(expr.as_ref(), Expr::Path(n, _) if n == &find.pat)
+            )
+        {
+            ir::Exp::app(
+                ir::Exp::var("find"),
+                vec![
+                    ir::Exp::Lam(vec!["x".into()], Box::new(pred)),
+                    ir::Exp::var(col),
+                ],
+            )
+        } else {
+            // find that returns a projection: listToMaybe (map f (filter p xs))
+            ir::Exp::app(
+                ir::Exp::var("listToMaybe"),
+                vec![ir::Exp::Map(
+                    Box::new(ir::Exp::Lam(vec!["x".into()], Box::new(val))),
+                    Box::new(ir::Exp::Filter(
+                        Box::new(ir::Exp::Lam(vec!["x".into()], Box::new(pred))),
+                        Box::new(ir::Exp::var(col)),
+                    )),
+                )],
+            )
+        };
+        return Some(wrap_setup_lets(block, find_exp, ctx));
+    }
+
+    if let Some(m) = crate::translate::loop_analysis::analyze_filtered_multi_accum(block) {
+        notes.detected.push("loop-carried state".into());
+        notes.detected.push("multiple accumulators".into());
+        if m.predicate.is_some() {
+            notes.detected.push("conditional update".into());
+        }
+        notes.translation.push("foldl over tuple state".into());
+        notes.summary = "foldl (…) (…) xs ; trailing expression".into();
+        return Some(wrap_setup_lets(
+            block,
+            lower_filtered_multi_accum(m, ctx),
+            ctx,
+        ));
+    }
+
     if let Some(scan) = patterns::detect_adjacent_order_scan(block) {
         notes.detected.push("adjacent comparison scan".into());
         notes.detected.push("early boolean exit".into());
@@ -906,6 +1009,112 @@ fn try_pattern_body(
     }
 
     None
+}
+
+fn lower_filtered_multi_accum(
+    m: crate::translate::loop_analysis::FilteredMultiAccum,
+    ctx: &mut LowerCtx,
+) -> ir::Exp {
+    let init_tuple = ir::Exp::Tuple(m.inits.iter().map(|(_, v)| lower_expr(v, ctx)).collect());
+    let acc_names: Vec<String> = m.inits.iter().map(|(n, _)| camel(n)).collect();
+    let mut next_vals: IndexMap<String, ir::Exp> = IndexMap::new();
+    for n in &acc_names {
+        next_vals.insert(n.clone(), ir::Exp::var(n.clone()));
+    }
+    for (target, op, value) in &m.updates {
+        let t = camel(target);
+        let mut v = lower_expr(value, ctx);
+        v = rename_var(&v, &camel(&m.pat), "x");
+        for n in &acc_names {
+            v = rename_var(&v, n, n); // no-op keep
+        }
+        let current = next_vals
+            .get(&t)
+            .cloned()
+            .unwrap_or_else(|| ir::Exp::var(t.clone()));
+        next_vals.insert(
+            t,
+            ir::Exp::BinOp(lower_binop(*op), Box::new(current), Box::new(v)),
+        );
+    }
+    let kept_tuple = ir::Exp::Tuple(acc_names.iter().map(|n| next_vals[n].clone()).collect());
+    let skip_tuple = ir::Exp::Tuple(acc_names.iter().map(|n| ir::Exp::var(n.clone())).collect());
+
+    let step_body = if let Some(pred_e) = &m.predicate {
+        let mut pred = lower_expr(pred_e, ctx);
+        pred = rename_var(&pred, &camel(&m.pat), "x");
+        ir::Exp::If(
+            Box::new(pred),
+            Box::new(kept_tuple),
+            Box::new(skip_tuple),
+        )
+    } else {
+        kept_tuple
+    };
+
+    let a = &acc_names[0];
+    let b = &acc_names[1];
+    let destructure = if acc_names.len() == 2 {
+        vec![
+            ir::Binding {
+                name: a.clone(),
+                value: ir::Exp::app(ir::Exp::var("fst"), vec![ir::Exp::var("acc")]),
+            },
+            ir::Binding {
+                name: b.clone(),
+                value: ir::Exp::app(ir::Exp::var("snd"), vec![ir::Exp::var("acc")]),
+            },
+        ]
+    } else {
+        // Fallback: bind whole acc (limited)
+        vec![ir::Binding {
+            name: "acc".into(),
+            value: ir::Exp::var("acc"),
+        }]
+    };
+
+    let fold_fn = ir::Exp::Lam(
+        vec!["acc".into(), "x".into()],
+        Box::new(ir::Exp::Let(destructure, Box::new(step_body))),
+    );
+    let folded = ir::Exp::Fold(
+        Box::new(fold_fn),
+        Box::new(init_tuple),
+        Box::new(ir::Exp::var(camel(&m.collection))),
+    );
+
+    // Bind acc names from folded tuple, then evaluate trailing
+    let mut trailing = lower_expr(&m.trailing, ctx);
+    for n in &acc_names {
+        trailing = rename_var(&trailing, n, n);
+    }
+    if acc_names.len() == 2 {
+        ir::Exp::Let(
+            vec![
+                ir::Binding {
+                    name: "state".into(),
+                    value: folded,
+                },
+                ir::Binding {
+                    name: a.clone(),
+                    value: ir::Exp::app(ir::Exp::var("fst"), vec![ir::Exp::var("state")]),
+                },
+                ir::Binding {
+                    name: b.clone(),
+                    value: ir::Exp::app(ir::Exp::var("snd"), vec![ir::Exp::var("state")]),
+                },
+            ],
+            Box::new(trailing),
+        )
+    } else {
+        ir::Exp::Let(
+            vec![ir::Binding {
+                name: "state".into(),
+                value: folded,
+            }],
+            Box::new(trailing),
+        )
+    }
 }
 
 fn lower_euclid_while(e: patterns::EuclidWhile, ctx: &mut LowerCtx) -> ir::Exp {
@@ -1209,8 +1418,8 @@ fn lower_stmts(
                     span.line,
                     span.column,
                 )
-                .note("Recognised general patterns: map via push, filter+map via conditional push, sum/fold reductions, continue/break folds, max scans, multi-accumulators, indexed search (elemIndex), adjacent order scans (zipWith).")
-                .note("If this loop has a clear functional meaning not listed above, it is a candidate for a new semantic pattern — see reports/coverage.md."),
+                .note("Recognised computations: filter+map builds (if/continue/temps), filtered folds, continue/break folds, max scans, multi-accumulators (incl. filtered), indexed search (elemIndex), early find, adjacent order scans (zipWith).")
+                .note("Raskell matches *computations* after normalising loop-local lets and skip/continue — not one AST template. See reports/coverage.md."),
             );
             ir::Exp::Error("unsupported for".into())
         }

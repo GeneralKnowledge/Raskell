@@ -484,7 +484,7 @@ fn path_names_in(expr: &Expr) -> Vec<String> {
     out
 }
 
-/// Detect conditional map via push:
+/// Detect conditional map via push (temps + continue-skips supported via loop_analysis).
 /// ```ignore
 /// let mut result = Vec::new();
 /// for x in xs {
@@ -492,61 +492,10 @@ fn path_names_in(expr: &Expr) -> Vec<String> {
 /// }
 /// result
 /// ```
-/// → filter + map (or mapMaybe)
+/// → filter + map
 pub fn detect_filter_map_push(block: &Block) -> Option<(String, String, Expr, Expr)> {
-    let skip = skip_setup_lets(block);
-    if block.stmts.len().saturating_sub(skip) < 2 {
-        return None;
-    }
-    let result_name = match &block.stmts[skip] {
-        Stmt::Let {
-            name,
-            is_mut: true,
-            value: Some(v),
-            ..
-        } if is_vec_new(v) => name.clone(),
-        _ => return None,
-    };
-    let (pat, iter, body) = match &block.stmts[skip + 1] {
-        Stmt::Expr(Expr::For {
-            pat, iter, body, ..
-        }) => (pat.clone(), iter, body),
-        _ => return None,
-    };
-    if !matches!(&block.expr, Some(e) if matches!(e.as_ref(), Expr::Path(n, _) if n == &result_name))
-    {
-        return None;
-    }
-    let (cond, then_branch) = for_body_if(body)?;
-    // then: result.push(EXPR)
-    let mapped = match then_branch
-        .stmts
-        .first()
-        .and_then(|s| match s {
-            Stmt::Expr(e) => Some(e),
-            _ => None,
-        })
-        .or(then_branch.expr.as_deref())
-    {
-        Some(Expr::MethodCall {
-            receiver,
-            method,
-            args,
-            ..
-        }) if method == "push"
-            && matches!(receiver.as_ref(), Expr::Path(n, _) if n == &result_name)
-            && args.len() == 1 =>
-        {
-            args[0].clone()
-        }
-        _ => return None,
-    };
-    let collection = match iter.as_ref() {
-        Expr::Path(n, _) => n.clone(),
-        _ => return None,
-    };
-    let _ = pat;
-    Some((result_name, collection, cond.clone(), mapped))
+    let m = crate::translate::loop_analysis::analyze_filter_map_build(block)?;
+    Some((m.result, m.collection, m.predicate, m.mapped))
 }
 
 /// Detect fold/reduction: `let mut acc = INIT; for x in xs { acc += EXPR }; acc`

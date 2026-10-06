@@ -211,7 +211,9 @@ The suite covers:
 
 ## Roadmap
 
-See [docs/roadmap.md](docs/roadmap.md). Near-term themes: richer ownership transforms, async subset, broader stdlib, property-based differential testing, source maps / LSP.
+See [docs/roadmap.md](docs/roadmap.md). Near-term themes: deeper composable loop analysis, property-based differentials, async/STM infrastructure, source maps / LSP.
+
+Stress corpus: `tests/rusty/` — including `convergence/` (same computation, many syntaxes) and `ugly/` (messy but legitimate Rust). Coverage: `reports/coverage.md`.
 
 ## License
 

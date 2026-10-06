@@ -30,6 +30,17 @@ not afterthought docs.
 
 ## Stress corpus
 
-Realistic Rust programs live under `tests/rusty/`. Coverage numbers and missed
-patterns are tracked in `reports/coverage.md`. The corpus is part of the
-compiler’s definition of “what Raskell understands.”
+Realistic Rust programs live under `tests/rusty/` (including `convergence/`
+variants that attack pattern brittleness, and `ugly/` for legitimate messy
+code). Coverage is tracked in `reports/coverage.md`.
+
+## Composable loop analysis
+
+`src/translate/loop_analysis.rs` normalises for-loop bodies before recognition:
+
+1. Substitute loop-local immutable `let`s (temps)
+2. Unify `if p { action }` with `if !p { continue }; action`
+3. Classify actions, then recognise computations (filter+map, filtered fold, find, …)
+
+Detectors in `patterns.rs` increasingly delegate to this layer instead of
+encoding “stmt[0] must be …, stmt[1] must be …” templates.

@@ -1,7 +1,7 @@
 {
   "summary": {
-    "total": 78,
-    "success": 68,
+    "total": 93,
+    "success": 83,
     "rejected_correctly": 10,
     "missed_opportunity": 0,
     "incorrect": 0,
@@ -80,6 +80,20 @@
     },
     {
       "file": "basic/06_tuple_swap.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/07_clamp.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/08_double.rs",
       "category": "basic",
       "status": "translated_ok",
       "verdict": "success",
@@ -207,6 +221,62 @@
     {
       "file": "control_flow/06_early_return.rs",
       "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/01_filter_map_if_push.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/02_filter_map_temp.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/03_filter_map_continue.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/04_filter_map_iter.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/05_fold_if.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/06_fold_temp.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/07_fold_continue.rs",
+      "category": "convergence",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "convergence/08_fold_iter.rs",
+      "category": "convergence",
       "status": "translated_ok",
       "verdict": "success",
       "detail": ""
@@ -401,6 +471,27 @@
       "detail": ""
     },
     {
+      "file": "ownership/07_slice_sum.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/08_first_positive_borrow.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/09_into_iter_map.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
       "file": "state/01_counter.rs",
       "category": "state",
       "status": "translated_ok",
@@ -485,6 +576,20 @@
       "detail": ""
     },
     {
+      "file": "ugly/01_average_skip_neg.rs",
+      "category": "ugly",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ugly/02_nested_temps_filter_sum.rs",
+      "category": "ugly",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
       "file": "unsupported/01_unsafe.rs",
       "category": "unsupported",
       "status": "rejected",
@@ -517,21 +622,21 @@
       "category": "unsupported",
       "status": "rejected",
       "verdict": "rejected_correctly",
-      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::cell::RefCell`\n --> 05_refcell.rs:1:1\n  |\n  1 |     stdlib import `std::cell::RefCell`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `RefCell`\n --> 05_refcell.r"
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::cell::RefCell`\n --> 05_refcell.rs:1:1\n  |\n  1 |     stdlib import `std::cell::RefCell`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside th"
     },
     {
       "file": "unsupported/06_rc.rs",
       "category": "unsupported",
       "status": "rejected",
       "verdict": "rejected_correctly",
-      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::rc::Rc`\n --> 06_rc.rs:1:1\n  |\n  1 |     stdlib import `std::rc::Rc`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `Rc`\n --> 06_rc.rs:2:1\n  |\n  2 |     type `Rc`\n  |   "
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::rc::Rc`\n --> 06_rc.rs:1:1\n  |\n  1 |     stdlib import `std::rc::Rc`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\n"
     },
     {
       "file": "unsupported/07_thread.rs",
       "category": "unsupported",
       "status": "rejected",
       "verdict": "rejected_correctly",
-      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::thread`\n --> 07_thread.rs:1:1\n  |\n  1 |     stdlib import `std::thread`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: `thread::spawn`\n --> 07_thread.rs:3:4\n  |\n  3 |     `t"
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::thread`\n --> 07_thread.rs:1:1\n  |\n  1 |     stdlib import `std::thread`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic mod"
     },
     {
       "file": "unsupported/08_trait_object.rs",
@@ -552,7 +657,7 @@
       "category": "unsupported",
       "status": "rejected",
       "verdict": "rejected_correctly",
-      "detail": "error[E0421]: unsupported Rust construct: non-method trait items\n --> 10_associated_type.rs:2:4\n  |\n  2 |     non-method trait items\n  |        ^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently supports method signatures in traits.\nerror: aborting due to 1 previous error\n"
+      "detail": "error[E0421]: unsupported Rust construct: non-method trait items\n --> 10_associated_type.rs:2:4\n  |\n  2 |     non-method trait items\n  |        ^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently supports method signatures in traits.\nerror: aborting due to 1 previous erro"
     }
   ]
 }

@@ -107,6 +107,7 @@ fn default_imports(module: &Module) -> Vec<HsImport> {
             "isNothing",
             "listToMaybe",
             "maybe",
+            "find",
         ],
     );
     let needs_either = module_needs(

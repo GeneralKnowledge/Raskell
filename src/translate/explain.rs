@@ -1,4 +1,4 @@
-//! `raskell explain` — human-readable translation decisions.
+//! `raskell explain` — human-readable translation decisions about *meaning*.
 
 use crate::haskell::pretty::pretty_print;
 use crate::ir::{self, Module};
@@ -25,12 +25,12 @@ impl Explanation {
             }
         }
         if !self.translation.is_empty() {
-            out.push_str("Semantic transformation:\n");
+            out.push_str("Semantic form:\n");
             for t in &self.translation {
                 out.push_str(&format!("  {t}\n"));
             }
         }
-        out.push_str("Generated:\n");
+        out.push_str("Haskell strategy:\n");
         for line in self.generated.lines() {
             out.push_str(&format!("  {line}\n"));
         }
@@ -43,7 +43,6 @@ pub fn explain_module(analyzed: &AnalyzedProgram, ir: &Module) -> Vec<Explanatio
     let mut seen = HashSet::new();
     let mut out = Vec::new();
 
-    // Pretty-print once so snippets can be extracted as real Haskell.
     let hs = crate::haskell::lower_module(ir)
         .ok()
         .map(|(m, _)| pretty_print(&m));
@@ -59,7 +58,7 @@ pub fn explain_module(analyzed: &AnalyzedProgram, ir: &Module) -> Vec<Explanatio
         out.push(Explanation {
             function: n.function.clone(),
             detected: n.detected.clone(),
-            translation: n.translation.clone(),
+            translation: enrich_translation(&n.translation, &n.detected, &n.generated_summary),
             generated: snippet,
         });
     }
@@ -85,11 +84,27 @@ pub fn explain_module(analyzed: &AnalyzedProgram, ir: &Module) -> Vec<Explanatio
                 .unwrap_or_else(|| format!("{} …", f.name));
             out.push(Explanation {
                 function: f.name.clone(),
-                detected: vec!["direct translation".into()],
-                translation: vec!["expression lowering".into()],
+                detected: vec!["direct expression lowering".into()],
+                translation: vec!["expression → Haskell term".into()],
                 generated: snippet,
             });
         }
+    }
+    out
+}
+
+fn enrich_translation(translation: &[String], detected: &[String], summary: &str) -> Vec<String> {
+    let mut out = translation.to_vec();
+    if out.is_empty() && !summary.is_empty() {
+        out.push(summary.to_string());
+    }
+    // Add a short reason line for complex state
+    let has_multi = detected.iter().any(|d| d.contains("multiple accumulators") || d.contains("loop-carried"));
+    if has_multi && !out.iter().any(|t| t.contains("Reason")) {
+        out.push(
+            "Reason: computation keeps loop-carried state that is not a plain map/filter/fold"
+                .into(),
+        );
     }
     out
 }
@@ -108,7 +123,6 @@ fn haskell_function_snippet(src: &str, hs_name: &str) -> Option<String> {
             continue;
         }
         if capturing {
-            // Stop at next top-level decl
             if !line.is_empty()
                 && !line.starts_with(' ')
                 && !line.starts_with('\t')
