@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install GHC
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.8"
+
+      - name: Install GMP (GHC linking)
+        run: sudo apt-get update && sudo apt-get install -y libgmp-dev
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Test
+        run: cargo test
+
+      - name: Translate examples
+        run: |
+          mkdir -p target/examples-hs
+          for f in examples/*.rs; do
+            name=$(basename "$f" .rs)
+            ./target/release/raskell translate "$f" -o "target/examples-hs/${name}.hs"
+          done
