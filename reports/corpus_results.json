@@ -1,548 +1,558 @@
-[
-  {
-    "file": "algorithms/01_max_manual.rs",
-    "category": "algorithms",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: this for-loop pattern\n --> 01_max_manual.rs:3:4\n  |\n  3 |     this for-loop pattern\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently recognises map/filter/sum-style loops.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "algorithms/02_linear_search.rs",
-    "category": "algorithms",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: this for-loop pattern\n --> 02_linear_search.rs:3:4\n  |\n  3 |     this for-loop pattern\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently recognises map/filter/sum-style loops.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "algorithms/03_fib.rs",
-    "category": "algorithms",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "algorithms/04_gcd.rs",
-    "category": "algorithms",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: while loops (generic)\n --> 04_gcd.rs:2:4\n  |\n  2 |     while loops (generic)\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = While loops need a clear functional interpretation; use recursion or for where possible.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "algorithms/05_is_sorted.rs",
-    "category": "algorithms",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: this for-loop pattern\n --> 05_is_sorted.rs:3:4\n  |\n  3 |     this for-loop pattern\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently recognises map/filter/sum-style loops.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "basic/01_square.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "basic/02_add.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "basic/03_abs_diff.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "basic/04_helpers.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "basic/05_recursion_fact.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "basic/06_tuple_swap.rs",
-    "category": "basic",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/01_iter_sum.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/02_iter_map_filter.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/03_for_push_map.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/04_for_filter_push.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/05_for_plain_sum.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/06_for_filter_sum.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/07_product_fold.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/08_any_all.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/09_take_skip.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/10_chain_zip.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/11_len_empty.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "collections/12_fold_mapped.rs",
-    "category": "collections",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "control_flow/01_if_else_chain.rs",
-    "category": "control_flow",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "control_flow/02_match_int.rs",
-    "category": "control_flow",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "control_flow/03_while_countdown.rs",
-    "category": "control_flow",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "control_flow/04_continue_break.rs",
-    "category": "control_flow",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: this for-loop pattern\n --> 04_continue_break.rs:3:4\n  |\n  3 |     this for-loop pattern\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently recognises map/filter/sum-style loops.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "control_flow/05_nested_if.rs",
-    "category": "control_flow",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "control_flow/06_early_return.rs",
-    "category": "control_flow",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "data_types/01_struct_product.rs",
-    "category": "data_types",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "data_types/02_nested_struct.rs",
-    "category": "data_types",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "data_types/03_enum_shape.rs",
-    "category": "data_types",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "data_types/04_enum_status.rs",
-    "category": "data_types",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "data_types/05_tuple_struct_fields.rs",
-    "category": "data_types",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/01_option_map.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/02_result_ok.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/03_try_chain.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/04_unwrap_or.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/05_and_then.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "errors/06_ok_or.rs",
-    "category": "errors",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/01_enumerate.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/02_flat_map.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/03_filter_map.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/04_find.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/05_count.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "iterators/06_rev.rs",
-    "category": "iterators",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "mixed/01_products_pipeline.rs",
-    "category": "mixed",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "mixed/02_option_result_combo.rs",
-    "category": "mixed",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "mixed/03_imperative_vs_iter.rs",
-    "category": "mixed",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "mixed/04_nested_helpers.rs",
-    "category": "mixed",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/01_move_field.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/02_record_update.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/03_borrow_field.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/04_mut_borrow_update.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/05_clone_return.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "ownership/06_pass_through.rs",
-    "category": "ownership",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "state/01_counter.rs",
-    "category": "state",
-    "status": "rejected",
-    "verdict": "missed_opportunity",
-    "detail": "error[E0421]: unsupported Rust construct: while loops (generic)\n --> 01_counter.rs:4:4\n  |\n  4 |     while loops (generic)\n  |        ^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = While loops need a clear functional interpretation; use recursion or for where possible.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "state/02_state_machine.rs",
-    "category": "state",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "state/03_two_accumulators.rs",
-    "category": "state",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/01_is_empty.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/02_contains.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/03_starts_ends.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/04_format.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/05_lines_len.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "strings/06_push_str_expr.rs",
-    "category": "strings",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "traits/01_greet.rs",
-    "category": "traits",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "traits/02_generic_id.rs",
-    "category": "traits",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "traits/03_bound_display.rs",
-    "category": "traits",
-    "status": "translated_ok",
-    "verdict": "success",
-    "detail": ""
-  },
-  {
-    "file": "unsupported/01_unsafe.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: unsafe\n --> 01_unsafe.rs:2:4\n  |\n  2 |     unsafe\n  |        ^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell cannot currently establish a safe semantic translation for this operation.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/02_async.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: async fn\n --> 02_async.rs:1:1\n  |\n  1 |     async fn\n  |     ^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Async/await is on the roadmap.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/03_raw_extern.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: FFI / extern blocks\n --> 03_raw_extern.rs:1:1\n  |\n  1 |     FFI / extern blocks\n  |     ^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/04_unknown_macro.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: macro `println_custom!`\n --> 04_unknown_macro.rs:2:4\n  |\n  2 |     macro `println_custom!`\n  |        ^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Supported macros: vec!, println!, print!, format!.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/05_refcell.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::cell::RefCell`\n --> 05_refcell.rs:1:1\n  |\n  1 |     stdlib import `std::cell::RefCell`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `RefCell`\n --> 05_refcell.r"
-  },
-  {
-    "file": "unsupported/06_rc.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::rc::Rc`\n --> 06_rc.rs:1:1\n  |\n  1 |     stdlib import `std::rc::Rc`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `Rc`\n --> 06_rc.rs:2:1\n  |\n  2 |     type `Rc`\n  |   "
-  },
-  {
-    "file": "unsupported/07_thread.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::thread`\n --> 07_thread.rs:1:1\n  |\n  1 |     stdlib import `std::thread`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: `thread::spawn`\n --> 07_thread.rs:3:4\n  |\n  3 |     `t"
-  },
-  {
-    "file": "unsupported/08_trait_object.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: this type\n --> 08_trait_object.rs:2:14\n  |\n  2 |     this type\n  |                  ^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/09_closure_mut_capture.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: this type\n --> 09_closure_mut_capture.rs:1:21\n  |\n  1 |     this type\n  |                         ^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
-  },
-  {
-    "file": "unsupported/10_associated_type.rs",
-    "category": "unsupported",
-    "status": "rejected",
-    "verdict": "rejected_correctly",
-    "detail": "error[E0421]: unsupported Rust construct: non-method trait items\n --> 10_associated_type.rs:2:4\n  |\n  2 |     non-method trait items\n  |        ^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently supports method signatures in traits.\nerror: aborting due to 1 previous error\n"
-  }
-]
+{
+  "summary": {
+    "total": 78,
+    "success": 68,
+    "rejected_correctly": 10,
+    "missed_opportunity": 0,
+    "incorrect": 0,
+    "should_have_rejected": 0
+  },
+  "files": [
+    {
+      "file": "algorithms/01_max_manual.rs",
+      "category": "algorithms",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "algorithms/02_linear_search.rs",
+      "category": "algorithms",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "algorithms/03_fib.rs",
+      "category": "algorithms",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "algorithms/04_gcd.rs",
+      "category": "algorithms",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "algorithms/05_is_sorted.rs",
+      "category": "algorithms",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/01_square.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/02_add.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/03_abs_diff.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/04_helpers.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/05_recursion_fact.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "basic/06_tuple_swap.rs",
+      "category": "basic",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/01_iter_sum.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/02_iter_map_filter.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/03_for_push_map.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/04_for_filter_push.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/05_for_plain_sum.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/06_for_filter_sum.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/07_product_fold.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/08_any_all.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/09_take_skip.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/10_chain_zip.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/11_len_empty.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "collections/12_fold_mapped.rs",
+      "category": "collections",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/01_if_else_chain.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/02_match_int.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/03_while_countdown.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/04_continue_break.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/05_nested_if.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "control_flow/06_early_return.rs",
+      "category": "control_flow",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "data_types/01_struct_product.rs",
+      "category": "data_types",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "data_types/02_nested_struct.rs",
+      "category": "data_types",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "data_types/03_enum_shape.rs",
+      "category": "data_types",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "data_types/04_enum_status.rs",
+      "category": "data_types",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "data_types/05_tuple_struct_fields.rs",
+      "category": "data_types",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/01_option_map.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/02_result_ok.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/03_try_chain.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/04_unwrap_or.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/05_and_then.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "errors/06_ok_or.rs",
+      "category": "errors",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/01_enumerate.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/02_flat_map.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/03_filter_map.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/04_find.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/05_count.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "iterators/06_rev.rs",
+      "category": "iterators",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "mixed/01_products_pipeline.rs",
+      "category": "mixed",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "mixed/02_option_result_combo.rs",
+      "category": "mixed",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "mixed/03_imperative_vs_iter.rs",
+      "category": "mixed",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "mixed/04_nested_helpers.rs",
+      "category": "mixed",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/01_move_field.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/02_record_update.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/03_borrow_field.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/04_mut_borrow_update.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/05_clone_return.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "ownership/06_pass_through.rs",
+      "category": "ownership",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "state/01_counter.rs",
+      "category": "state",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "state/02_state_machine.rs",
+      "category": "state",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "state/03_two_accumulators.rs",
+      "category": "state",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/01_is_empty.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/02_contains.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/03_starts_ends.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/04_format.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/05_lines_len.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "strings/06_push_str_expr.rs",
+      "category": "strings",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "traits/01_greet.rs",
+      "category": "traits",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "traits/02_generic_id.rs",
+      "category": "traits",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "traits/03_bound_display.rs",
+      "category": "traits",
+      "status": "translated_ok",
+      "verdict": "success",
+      "detail": ""
+    },
+    {
+      "file": "unsupported/01_unsafe.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: unsafe\n --> 01_unsafe.rs:2:4\n  |\n  2 |     unsafe\n  |        ^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell cannot currently establish a safe semantic translation for this operation.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/02_async.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: async fn\n --> 02_async.rs:1:1\n  |\n  1 |     async fn\n  |     ^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Async/await is on the roadmap.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/03_raw_extern.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: FFI / extern blocks\n --> 03_raw_extern.rs:1:1\n  |\n  1 |     FFI / extern blocks\n  |     ^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/04_unknown_macro.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: macro `println_custom!`\n --> 04_unknown_macro.rs:2:4\n  |\n  2 |     macro `println_custom!`\n  |        ^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Supported macros: vec!, println!, print!, format!.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/05_refcell.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::cell::RefCell`\n --> 05_refcell.rs:1:1\n  |\n  1 |     stdlib import `std::cell::RefCell`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `RefCell`\n --> 05_refcell.r"
+    },
+    {
+      "file": "unsupported/06_rc.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::rc::Rc`\n --> 06_rc.rs:1:1\n  |\n  1 |     stdlib import `std::rc::Rc`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: type `Rc`\n --> 06_rc.rs:2:1\n  |\n  2 |     type `Rc`\n  |   "
+    },
+    {
+      "file": "unsupported/07_thread.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: stdlib import `std::thread`\n --> 07_thread.rs:1:1\n  |\n  1 |     stdlib import `std::thread`\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Interior mutability, reference counting, and threading are outside the current semantic model.\nerror[E0421]: unsupported Rust construct: `thread::spawn`\n --> 07_thread.rs:3:4\n  |\n  3 |     `t"
+    },
+    {
+      "file": "unsupported/08_trait_object.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: this type\n --> 08_trait_object.rs:2:14\n  |\n  2 |     this type\n  |                  ^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/09_closure_mut_capture.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: this type\n --> 09_closure_mut_capture.rs:1:21\n  |\n  1 |     this type\n  |                         ^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\nerror: aborting due to 1 previous error\n"
+    },
+    {
+      "file": "unsupported/10_associated_type.rs",
+      "category": "unsupported",
+      "status": "rejected",
+      "verdict": "rejected_correctly",
+      "detail": "error[E0421]: unsupported Rust construct: non-method trait items\n --> 10_associated_type.rs:2:4\n  |\n  2 |     non-method trait items\n  |        ^^^^^^^^^^^^^^^^^^^^^^\n  = Raskell cannot currently establish a safe semantic translation for this operation.\n  = See the README roadmap for planned support.\n  = Raskell currently supports method signatures in traits.\nerror: aborting due to 1 previous error\n"
+    }
+  ]
+}
