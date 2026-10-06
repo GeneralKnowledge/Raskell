@@ -114,6 +114,11 @@ pub enum HsExp {
         name: String,
         fields: IndexMap<String, HsExp>,
     },
+    /// `base { field = value, … }`
+    RecordUpdate {
+        base: Box<HsExp>,
+        fields: IndexMap<String, HsExp>,
+    },
     Field(Box<HsExp>, String),
     Paren(Box<HsExp>),
     Neg(Box<HsExp>),

@@ -100,10 +100,12 @@ pub fn analyze(program: &Program) -> anyhow::Result<(AnalyzedProgram, Diagnostic
         match item {
             Item::Function(f) => {
                 scan_unsupported_in_block(&f.body, &program.filename, &mut diags);
+                scan_unsupported_types_in_fn(f, &program.filename, &mut diags);
             }
             Item::Impl(i) => {
                 for m in &i.methods {
                     scan_unsupported_in_block(&m.body, &program.filename, &mut diags);
+                    scan_unsupported_types_in_fn(m, &program.filename, &mut diags);
                 }
             }
             Item::Trait(t) => {
@@ -111,6 +113,19 @@ pub fn analyze(program: &Program) -> anyhow::Result<(AnalyzedProgram, Diagnostic
                     if let Some(body) = &m.default_body {
                         scan_unsupported_in_block(body, &program.filename, &mut diags);
                     }
+                }
+            }
+            Item::Use(u) => {
+                if is_unsupported_path(&u.path) {
+                    diags.push(
+                        Diagnostic::unsupported(
+                            &format!("stdlib import `{}`", u.path),
+                            &program.filename,
+                            u.span.line,
+                            u.span.column,
+                        )
+                        .note("Interior mutability, reference counting, and threading are outside the current semantic model."),
+                    );
                 }
             }
             _ => {}
@@ -383,4 +398,202 @@ fn scan_unsupported_in_block(block: &Block, filename: &str, diags: &mut Diagnost
 fn scan_unsupported_expr(expr: &Expr, filename: &str, diags: &mut Diagnostics) {
     let scope = HashSet::new();
     check_expr(expr, filename, &scope, diags);
+    walk_paths(expr, &mut |path, span| {
+        if is_unsupported_path(path) {
+            diags.push(
+                Diagnostic::unsupported(
+                    &format!("`{path}`"),
+                    filename,
+                    span.line,
+                    span.column,
+                )
+                .note("Interior mutability, reference counting, and threading lack a sound erasure today."),
+            );
+        }
+    });
+}
+
+fn scan_unsupported_types_in_fn(f: &Function, filename: &str, diags: &mut Diagnostics) {
+    for p in &f.params {
+        scan_unsupported_type(&p.ty, filename, f.span, diags);
+    }
+    if let Some(ty) = &f.return_type {
+        scan_unsupported_type(ty, filename, f.span, diags);
+    }
+}
+
+fn scan_unsupported_type(ty: &Type, filename: &str, span: Span, diags: &mut Diagnostics) {
+    match ty {
+        Type::Named(name, args) => {
+            if is_unsupported_path(name)
+                || matches!(
+                    name.as_str(),
+                    "RefCell" | "Rc" | "Arc" | "Cell" | "Mutex" | "RwLock"
+                )
+            {
+                diags.push(
+                    Diagnostic::unsupported(
+                        &format!("type `{name}`"),
+                        filename,
+                        span.line,
+                        span.column,
+                    )
+                    .note("Smart pointers and interior mutability are not erased by the current model."),
+                );
+            }
+            if name.contains("dyn ") || name.starts_with("dyn") {
+                diags.push(
+                    Diagnostic::unsupported(
+                        "trait objects (`dyn Trait`)",
+                        filename,
+                        span.line,
+                        span.column,
+                    )
+                    .note("Dynamic dispatch needs a different representation; deferred."),
+                );
+            }
+            for a in args {
+                scan_unsupported_type(a, filename, span, diags);
+            }
+        }
+        Type::Tuple(ts) => {
+            for t in ts {
+                scan_unsupported_type(t, filename, span, diags);
+            }
+        }
+        Type::Ref { inner, .. } | Type::Array(inner) | Type::Vec(inner) | Type::Option(inner) => {
+            scan_unsupported_type(inner, filename, span, diags);
+        }
+        Type::Result(a, b) => {
+            scan_unsupported_type(a, filename, span, diags);
+            scan_unsupported_type(b, filename, span, diags);
+        }
+        Type::Fun { params, ret } => {
+            for t in params {
+                scan_unsupported_type(t, filename, span, diags);
+            }
+            scan_unsupported_type(ret, filename, span, diags);
+        }
+        Type::Path(parts) => {
+            let name = parts.join("::");
+            if is_unsupported_path(&name) {
+                diags.push(
+                    Diagnostic::unsupported(
+                        &format!("type `{name}`"),
+                        filename,
+                        span.line,
+                        span.column,
+                    )
+                    .note("Smart pointers and interior mutability are not erased by the current model."),
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_unsupported_path(path: &str) -> bool {
+    let p = path.replace(' ', "");
+    p.contains("RefCell")
+        || p.contains("std::rc::Rc")
+        || p.ends_with("::Rc")
+        || p == "Rc"
+        || p.contains("std::sync::Arc")
+        || p.ends_with("::Arc")
+        || p == "Arc"
+        || p.contains("std::cell::Cell")
+        || p.contains("std::thread")
+        || p.contains("thread::spawn")
+        || p.contains("std::sync::Mutex")
+        || p.contains("std::sync::RwLock")
+}
+
+fn walk_paths(expr: &Expr, f: &mut impl FnMut(&str, Span)) {
+    match expr {
+        Expr::Path(p, span) => f(p, *span),
+        Expr::Field { base, .. } | Expr::Deref { expr: base, .. } | Expr::Reference { expr: base, .. }
+        | Expr::Unary { expr: base, .. } | Expr::Try(base, _) | Expr::Cast { expr: base, .. }
+        | Expr::Return(Some(base), _) => walk_paths(base, f),
+        Expr::Index { base, index, .. } | Expr::Binary { left: base, right: index, .. }
+        | Expr::Assign { target: base, value: index, .. }
+        | Expr::AssignOp { target: base, value: index, .. } => {
+            walk_paths(base, f);
+            walk_paths(index, f);
+        }
+        Expr::Call { func, args, .. } => {
+            walk_paths(func, f);
+            for a in args {
+                walk_paths(a, f);
+            }
+        }
+        Expr::MethodCall { receiver, args, .. } => {
+            walk_paths(receiver, f);
+            for a in args {
+                walk_paths(a, f);
+            }
+        }
+        Expr::If {
+            cond,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            walk_paths(cond, f);
+            for s in &then_branch.stmts {
+                if let Stmt::Expr(e) | Stmt::Let { value: Some(e), .. } | Stmt::Return(Some(e), _) = s {
+                    walk_paths(e, f);
+                }
+            }
+            if let Some(e) = &then_branch.expr {
+                walk_paths(e, f);
+            }
+            if let Some(e) = else_branch {
+                walk_paths(e, f);
+            }
+        }
+        Expr::Match { scrutinee, arms, .. } => {
+            walk_paths(scrutinee, f);
+            for arm in arms {
+                walk_paths(&arm.body, f);
+            }
+        }
+        Expr::Block(b) => {
+            for s in &b.stmts {
+                if let Stmt::Expr(e) | Stmt::Let { value: Some(e), .. } | Stmt::Return(Some(e), _) = s {
+                    walk_paths(e, f);
+                }
+            }
+            if let Some(e) = &b.expr {
+                walk_paths(e, f);
+            }
+        }
+        Expr::Closure { body, .. } => walk_paths(body, f),
+        Expr::Tuple(es, _) | Expr::Array(es, _) => {
+            for e in es {
+                walk_paths(e, f);
+            }
+        }
+        Expr::Struct { fields, .. } => {
+            for (_, e) in fields {
+                walk_paths(e, f);
+            }
+        }
+        Expr::For { iter, body, .. } => {
+            walk_paths(iter, f);
+            for s in &body.stmts {
+                if let Stmt::Expr(e) | Stmt::Let { value: Some(e), .. } | Stmt::Return(Some(e), _) = s {
+                    walk_paths(e, f);
+                }
+            }
+        }
+        Expr::While { cond, body, .. } => {
+            walk_paths(cond, f);
+            for s in &body.stmts {
+                if let Stmt::Expr(e) | Stmt::Let { value: Some(e), .. } | Stmt::Return(Some(e), _) = s {
+                    walk_paths(e, f);
+                }
+            }
+        }
+        _ => {}
+    }
 }

@@ -26,3 +26,10 @@ not afterthought docs.
 - Map `Option`/`Result`/`?` onto `Maybe`/`Either`/do-notation.
 - Map traits/`impl` onto `class`/`instance` with constrained signatures.
 - Prefer Prelude/`Data.Maybe`/`Data.Either` over a custom runtime.
+- Prefer **semantic convergence**: iterator style and imperative style that mean the same thing should lower to equivalent IR (see `tests/rusty/mixed/03_imperative_vs_iter.rs`).
+
+## Stress corpus
+
+Realistic Rust programs live under `tests/rusty/`. Coverage numbers and missed
+patterns are tracked in `reports/coverage.md`. The corpus is part of the
+compiler’s definition of “what Raskell understands.”
