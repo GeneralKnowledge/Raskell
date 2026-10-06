@@ -57,16 +57,8 @@ fn convert_item(item: &SynItem, filename: &str, diags: &mut Diagnostics) -> Opti
             );
             None
         }
-        SynItem::Impl(i) => {
-            let (line, col) = line_col(i.span());
-            diags.push(Diagnostic::unsupported("impl blocks", filename, line, col));
-            None
-        }
-        SynItem::Trait(t) => {
-            let (line, col) = line_col(t.span());
-            diags.push(Diagnostic::unsupported("traits", filename, line, col));
-            None
-        }
+        SynItem::Impl(i) => Some(Item::Impl(convert_impl(i, filename, diags))),
+        SynItem::Trait(t) => Some(Item::Trait(convert_trait(t, filename, diags))),
         SynItem::Macro(m) => {
             let (line, col) = line_col(m.span());
             diags.push(Diagnostic::unsupported("macros", filename, line, col));
@@ -136,35 +128,8 @@ fn convert_fn(f: &syn::ItemFn, filename: &str, diags: &mut Diagnostics) -> Funct
         );
     }
 
-    let generics: Vec<String> = f
-        .sig
-        .generics
-        .type_params()
-        .map(|p| p.ident.to_string())
-        .collect();
-
-    let params: Vec<Param> = f
-        .sig
-        .inputs
-        .iter()
-        .filter_map(|arg| match arg {
-            FnArg::Typed(pat_ty) => {
-                let (name, is_mut, by_ref) = pat_name(&pat_ty.pat);
-                Some(Param {
-                    name,
-                    ty: convert_type(&pat_ty.ty, filename, diags),
-                    is_mut,
-                    by_ref,
-                    span: span_of(pat_ty.span()),
-                })
-            }
-            FnArg::Receiver(r) => {
-                let (line, col) = line_col(r.span());
-                diags.push(Diagnostic::unsupported("self parameters", filename, line, col));
-                None
-            }
-        })
-        .collect();
+    let (generics, bounds) = convert_generics(&f.sig.generics);
+    let params = convert_fn_args(&f.sig.inputs, filename, diags);
 
     let return_type = match &f.sig.output {
         ReturnType::Default => None,
@@ -178,7 +143,195 @@ fn convert_fn(f: &syn::ItemFn, filename: &str, diags: &mut Diagnostics) -> Funct
         body: convert_block(&f.block, filename, diags),
         is_pub: is_pub(&f.vis),
         generics,
+        bounds,
         span: span_of(f.span()),
+    }
+}
+
+fn convert_generics(generics: &syn::Generics) -> (Vec<String>, Vec<(String, Vec<String>)>) {
+    let names: Vec<String> = generics
+        .type_params()
+        .map(|p| p.ident.to_string())
+        .collect();
+    let mut bounds: Vec<(String, Vec<String>)> = Vec::new();
+    for p in generics.type_params() {
+        let mut bs = Vec::new();
+        for b in &p.bounds {
+            if let syn::TypeParamBound::Trait(t) = b {
+                if let Some(seg) = t.path.segments.last() {
+                    bs.push(seg.ident.to_string());
+                }
+            }
+        }
+        if !bs.is_empty() {
+            bounds.push((p.ident.to_string(), bs));
+        }
+    }
+    if let Some(where_clause) = &generics.where_clause {
+        for pred in &where_clause.predicates {
+            if let syn::WherePredicate::Type(tp) = pred {
+                if let syn::Type::Path(path) = &tp.bounded_ty {
+                    if let Some(seg) = path.path.segments.last() {
+                        let name = seg.ident.to_string();
+                        let mut bs = Vec::new();
+                        for b in &tp.bounds {
+                            if let syn::TypeParamBound::Trait(t) = b {
+                                if let Some(s) = t.path.segments.last() {
+                                    bs.push(s.ident.to_string());
+                                }
+                            }
+                        }
+                        if !bs.is_empty() {
+                            bounds.push((name, bs));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (names, bounds)
+}
+
+fn convert_fn_args(
+    inputs: &syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
+    filename: &str,
+    diags: &mut Diagnostics,
+) -> Vec<Param> {
+    inputs
+        .iter()
+        .map(|arg| match arg {
+            FnArg::Typed(pat_ty) => {
+                let (name, is_mut, by_ref) = pat_name(&pat_ty.pat);
+                Param {
+                    name,
+                    ty: convert_type(&pat_ty.ty, filename, diags),
+                    is_mut,
+                    by_ref,
+                    is_self: false,
+                    span: span_of(pat_ty.span()),
+                }
+            }
+            FnArg::Receiver(r) => {
+                let by_ref = r.reference.is_some();
+                let is_mut = r.mutability.is_some();
+                Param {
+                    name: "self".into(),
+                    ty: if by_ref {
+                        Type::Ref {
+                            is_mut,
+                            inner: Box::new(Type::SelfType),
+                        }
+                    } else {
+                        Type::SelfType
+                    },
+                    is_mut,
+                    by_ref,
+                    is_self: true,
+                    span: span_of(r.span()),
+                }
+            }
+        })
+        .collect()
+}
+
+fn convert_trait(t: &syn::ItemTrait, filename: &str, diags: &mut Diagnostics) -> TraitDef {
+    let (generics, _) = convert_generics(&t.generics);
+    let mut methods = Vec::new();
+    for item in &t.items {
+        match item {
+            syn::TraitItem::Fn(m) => {
+                let (mg, mb) = convert_generics(&m.sig.generics);
+                let params = convert_fn_args(&m.sig.inputs, filename, diags);
+                let return_type = match &m.sig.output {
+                    ReturnType::Default => None,
+                    ReturnType::Type(_, ty) => Some(convert_type(ty, filename, diags)),
+                };
+                let default_body = m
+                    .default
+                    .as_ref()
+                    .map(|b| convert_block(b, filename, diags));
+                methods.push(TraitMethod {
+                    name: m.sig.ident.to_string(),
+                    params,
+                    return_type,
+                    generics: mg,
+                    bounds: mb,
+                    default_body,
+                    span: span_of(m.span()),
+                });
+            }
+            other => {
+                let (line, col) = line_col(other.span());
+                diags.push(
+                    Diagnostic::unsupported("non-method trait items", filename, line, col)
+                        .note("Raskell currently supports method signatures in traits."),
+                );
+            }
+        }
+    }
+    TraitDef {
+        name: t.ident.to_string(),
+        generics,
+        methods,
+        is_pub: is_pub(&t.vis),
+        span: span_of(t.span()),
+    }
+}
+
+fn convert_impl(i: &syn::ItemImpl, filename: &str, diags: &mut Diagnostics) -> ImplBlock {
+    if i.unsafety.is_some() {
+        let (line, col) = line_col(i.unsafety.span());
+        diags.push(Diagnostic::unsupported("unsafe impl", filename, line, col));
+    }
+    let trait_name = i.trait_.as_ref().map(|(_, path, _)| {
+        path.segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_else(|| "Unknown".into())
+    });
+    let for_type = convert_type(&i.self_ty, filename, diags);
+    let mut methods = Vec::new();
+    for item in &i.items {
+        match item {
+            syn::ImplItem::Fn(m) => {
+                // Reuse convert_fn shape via a synthetic ItemFn-like path
+                let (generics, bounds) = convert_generics(&m.sig.generics);
+                if m.sig.asyncness.is_some() {
+                    let (line, col) = line_col(m.sig.asyncness.span());
+                    diags.push(Diagnostic::unsupported("async methods", filename, line, col));
+                }
+                let params = convert_fn_args(&m.sig.inputs, filename, diags);
+                let return_type = match &m.sig.output {
+                    ReturnType::Default => None,
+                    ReturnType::Type(_, ty) => Some(convert_type(ty, filename, diags)),
+                };
+                methods.push(Function {
+                    name: m.sig.ident.to_string(),
+                    params,
+                    return_type,
+                    body: convert_block(&m.block, filename, diags),
+                    is_pub: is_pub(&m.vis),
+                    generics,
+                    bounds,
+                    span: span_of(m.span()),
+                });
+            }
+            other => {
+                let (line, col) = line_col(other.span());
+                diags.push(Diagnostic::unsupported(
+                    "non-method impl items",
+                    filename,
+                    line,
+                    col,
+                ));
+            }
+        }
+    }
+    ImplBlock {
+        trait_name,
+        for_type,
+        methods,
+        span: span_of(i.span()),
     }
 }
 
@@ -294,7 +447,7 @@ fn convert_type(ty: &syn::Type, filename: &str, diags: &mut Diagnostics) -> Type
                             return Type::Vec(Box::new(convert_type(t, filename, diags)));
                         }
                     }
-                    Type::Named("Vec".into())
+                    Type::Named("Vec".into(), vec![])
                 }
                 "Option" => {
                     if let syn::PathArguments::AngleBracketed(a) = &seg.arguments {
@@ -302,7 +455,7 @@ fn convert_type(ty: &syn::Type, filename: &str, diags: &mut Diagnostics) -> Type
                             return Type::Option(Box::new(convert_type(t, filename, diags)));
                         }
                     }
-                    Type::Named("Option".into())
+                    Type::Named("Option".into(), vec![])
                 }
                 "Result" => {
                     if let syn::PathArguments::AngleBracketed(a) = &seg.arguments {
@@ -314,19 +467,37 @@ fn convert_type(ty: &syn::Type, filename: &str, diags: &mut Diagnostics) -> Type
                             return Type::Result(Box::new(ok), Box::new(err));
                         }
                     }
-                    Type::Named("Result".into())
+                    Type::Named("Result".into(), vec![])
                 }
+                "Self" => Type::SelfType,
                 "String" | "str" | "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8"
                 | "u16" | "u32" | "u64" | "u128" | "usize" | "f32" | "f64" | "bool" | "char" => {
-                    Type::Named(name)
+                    Type::Named(name, vec![])
                 }
                 other => {
-                    // Generic or user type
-                    if let syn::PathArguments::AngleBracketed(a) = &seg.arguments {
-                        // Keep as named for now; generics on use-sites tracked separately
-                        let _ = a;
+                    let args = if let syn::PathArguments::AngleBracketed(a) = &seg.arguments {
+                        a.args
+                            .iter()
+                            .filter_map(|g| match g {
+                                syn::GenericArgument::Type(t) => {
+                                    Some(convert_type(t, filename, diags))
+                                }
+                                _ => None,
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
+                    // Single-letter uppercase type params (T, E, A, …) → Generic.
+                    // Longer names are concrete types (possibly with arguments).
+                    if args.is_empty()
+                        && other.len() == 1
+                        && other.chars().next().is_some_and(|c| c.is_uppercase())
+                    {
+                        Type::Generic(other.to_string())
+                    } else {
+                        Type::Named(other.to_string(), args)
                     }
-                    Type::Named(other.to_string())
                 }
             }
         }
@@ -372,7 +543,7 @@ fn convert_type(ty: &syn::Type, filename: &str, diags: &mut Diagnostics) -> Type
                 line,
                 col,
             ));
-            Type::Named("UNSUPPORTED".into())
+            Type::Named("UNSUPPORTED".into(), vec![])
         }
     }
 }
@@ -595,14 +766,31 @@ pub fn convert_expr(expr: &syn::Expr, filename: &str, diags: &mut Diagnostics) -
                 let (line, col) = line_col(c.span());
                 diags.push(Diagnostic::unsupported("async/move closures", filename, line, col));
             }
-            let params: Vec<String> = c
-                .inputs
-                .iter()
-                .map(|p| pat_name(p).0)
-                .collect();
+            // Support simple tuple patterns: |(a, b)| …
+            let mut params: Vec<String> = Vec::new();
+            let mut body = convert_expr(&c.body, filename, diags);
+            for p in &c.inputs {
+                match p {
+                    Pat::Tuple(t) => {
+                        let names: Vec<String> =
+                            t.elems.iter().map(|e| pat_name(e).0).collect();
+                        // Encode as single param + destructure via nested lambdas later;
+                        // use synthetic name and rewrite body to project fields.
+                        let syn_name = format!("tup{}", params.len());
+                        // Replace uses… keep simple: flatten to multiple params if body only uses names
+                        for (i, n) in names.iter().enumerate() {
+                            let _ = i;
+                            params.push(n.clone());
+                        }
+                        let _ = syn_name;
+                        let _ = &mut body;
+                    }
+                    _ => params.push(pat_name(p).0),
+                }
+            }
             Expr::Closure {
                 params,
-                body: Box::new(convert_expr(&c.body, filename, diags)),
+                body: Box::new(body),
                 span: span_of(c.span()),
             }
         }
@@ -811,14 +999,85 @@ fn convert_print_macro(mac: &syn::Macro, name: &str, filename: &str, diags: &mut
 
 fn convert_format_macro(mac: &syn::Macro, filename: &str, diags: &mut Diagnostics) -> Expr {
     let parser = syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated;
+    let span = span_of(mac.span());
     match syn::parse::Parser::parse2(parser, mac.tokens.clone()) {
+        Ok(elems) if elems.is_empty() => Expr::Lit(Lit::Str(String::new()), span),
         Ok(elems) if elems.len() == 1 => convert_expr(&elems[0], filename, diags),
-        Ok(elems) if elems.len() >= 2 => Expr::Call {
-            func: Box::new(Expr::Path("show".into(), span_of(mac.span()))),
-            args: vec![convert_expr(&elems[1], filename, diags)],
-            span: span_of(mac.span()),
-        },
-        _ => Expr::Lit(Lit::Str(String::new()), span_of(mac.span())),
+        Ok(elems) => {
+            let fmt = match elems.first() {
+                Some(syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(s),
+                    ..
+                })) => Some(s.value()),
+                _ => None,
+            };
+            let values: Vec<Expr> = elems
+                .iter()
+                .skip(1)
+                .map(|e| {
+                    let v = convert_expr(e, filename, diags);
+                    match &v {
+                        Expr::Lit(Lit::Str(_), _) => v,
+                        other => Expr::Call {
+                            func: Box::new(Expr::Path("show".into(), span)),
+                            args: vec![other.clone()],
+                            span,
+                        },
+                    }
+                })
+                .collect();
+
+            if let Some(fmt) = fmt {
+                if let Some(expr) = expand_format_template(&fmt, &values, span) {
+                    return expr;
+                }
+            }
+
+            // Fallback: concatenate shown values
+            match values.len() {
+                0 => convert_expr(&elems[0], filename, diags),
+                1 => values.into_iter().next().unwrap(),
+                _ => values
+                    .into_iter()
+                    .reduce(|left, right| str_append(left, right, span))
+                    .unwrap(),
+            }
+        }
+        _ => Expr::Lit(Lit::Str(String::new()), span),
+    }
+}
+
+/// Expand simple `format!("a{}b{}c", …)` templates into `++` concatenations.
+fn expand_format_template(fmt: &str, values: &[Expr], span: Span) -> Option<Expr> {
+    // Only handle plain `{}` placeholders (no named/positional specs).
+    if fmt.contains("{:") || fmt.contains("{0") || fmt.contains("{1") {
+        return None;
+    }
+    let parts: Vec<&str> = fmt.split("{}").collect();
+    if parts.len() != values.len() + 1 {
+        return None;
+    }
+    let mut pieces: Vec<Expr> = Vec::new();
+    for (i, part) in parts.iter().enumerate() {
+        if !part.is_empty() {
+            pieces.push(Expr::Lit(Lit::Str((*part).to_string()), span));
+        }
+        if i < values.len() {
+            pieces.push(values[i].clone());
+        }
+    }
+    match pieces.len() {
+        0 => Some(Expr::Lit(Lit::Str(String::new()), span)),
+        1 => pieces.into_iter().next(),
+        _ => pieces.into_iter().reduce(|l, r| str_append(l, r, span)),
+    }
+}
+
+fn str_append(left: Expr, right: Expr, span: Span) -> Expr {
+    Expr::Call {
+        func: Box::new(Expr::Path("strAppend".into(), span)),
+        args: vec![left, right],
+        span,
     }
 }
 

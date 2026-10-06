@@ -20,10 +20,47 @@ pub fn lower_module(module: &Module) -> anyhow::Result<(HsModule, Diagnostics)> 
             ir::Decl::Data(d) => {
                 hs.decls.push(lower_data(d));
             }
+            ir::Decl::Class(c) => {
+                hs.decls.push(HsDecl::Class {
+                    name: c.name.clone(),
+                    type_var: c.type_var.clone(),
+                    methods: c
+                        .methods
+                        .iter()
+                        .map(|m| (m.name.clone(), lower_ty(&m.ty)))
+                        .collect(),
+                });
+            }
+            ir::Decl::Instance(inst) => {
+                hs.decls.push(HsDecl::Instance {
+                    class: inst.class.clone(),
+                    ty: lower_ty(&inst.ty),
+                    methods: inst
+                        .methods
+                        .iter()
+                        .map(|f| {
+                            (
+                                f.name.clone(),
+                                f.params
+                                    .iter()
+                                    .map(|(n, _)| HsPat::Var(n.clone()))
+                                    .collect(),
+                                lower_exp(&f.body),
+                            )
+                        })
+                        .collect(),
+                });
+            }
             ir::Decl::Func(f) => {
+                let mut ty = lower_fun_type(&f.params, &f.return_ty);
+                // Quantify free type vars if present (Haskell infers, but show constraints)
+                if !f.constraints.is_empty() {
+                    ty = HsType::Constrained(f.constraints.clone(), Box::new(ty));
+                }
                 hs.decls.push(HsDecl::TypeSig {
                     name: f.name.clone(),
-                    ty: lower_fun_type(&f.params, &f.return_ty),
+                    constraints: f.constraints.clone(),
+                    ty,
                 });
                 hs.decls.push(HsDecl::FunBind {
                     name: f.name.clone(),
@@ -41,6 +78,7 @@ pub fn lower_module(module: &Module) -> anyhow::Result<(HsModule, Diagnostics)> 
             ir::Decl::Const { name, ty, value } => {
                 hs.decls.push(HsDecl::TypeSig {
                     name: name.clone(),
+                    constraints: vec![],
                     ty: lower_ty(ty),
                 });
                 hs.decls.push(HsDecl::PatBind {
@@ -56,8 +94,35 @@ pub fn lower_module(module: &Module) -> anyhow::Result<(HsModule, Diagnostics)> 
 
 fn default_imports(module: &Module) -> Vec<HsImport> {
     let mut imports = vec![];
-    let needs_maybe = module_needs(module, &["Just", "Nothing", "Maybe", "fromMaybe", "fromJust", "mapMaybe"]);
-    let needs_either = module_needs(module, &["Left", "Right", "Either", "either"]);
+    let needs_maybe = module_needs(
+        module,
+        &[
+            "Just",
+            "Nothing",
+            "Maybe",
+            "fromMaybe",
+            "fromJust",
+            "mapMaybe",
+            "isJust",
+            "isNothing",
+            "listToMaybe",
+            "maybe",
+        ],
+    );
+    let needs_either = module_needs(
+        module,
+        &["Left", "Right", "Either", "either", "isRight", "isLeft"],
+    );
+    let needs_list = module_needs(
+        module,
+        &[
+            "isInfixOf",
+            "isPrefixOf",
+            "isSuffixOf",
+            "partition",
+            "mapMaybe",
+        ],
+    );
     let needs_word = module_has_ty(module, |t| matches!(t, Ty::Word32 | Ty::Word64));
 
     // Hide Prelude names that collide with user definitions
@@ -113,6 +178,14 @@ fn default_imports(module: &Module) -> Vec<HsImport> {
             items: None,
         });
     }
+    if needs_list {
+        imports.push(HsImport {
+            module: "Data.List".into(),
+            qualified: false,
+            alias: None,
+            items: None,
+        });
+    }
     imports
 }
 
@@ -140,6 +213,16 @@ fn module_has_ty(module: &Module, pred: impl Fn(&Ty) -> bool) -> bool {
             }
             ir::Decl::Const { ty, .. } => {
                 if pred(ty) {
+                    return true;
+                }
+            }
+            ir::Decl::Class(c) => {
+                if c.methods.iter().any(|m| pred(&m.ty)) {
+                    return true;
+                }
+            }
+            ir::Decl::Instance(i) => {
+                if pred(&i.ty) || i.methods.iter().any(|f| pred(&f.return_ty)) {
                     return true;
                 }
             }
@@ -175,7 +258,17 @@ fn lower_data(d: &ir::DataType) -> HsDecl {
 
     HsDecl::Data {
         name: d.name.clone(),
-        generics: d.generics.iter().map(|g| g.to_lowercase()).collect(),
+        generics: d
+            .generics
+            .iter()
+            .map(|g| {
+                let mut c = g.chars();
+                match c.next() {
+                    Some(ch) => format!("{}{}", ch.to_lowercase(), c.collect::<String>()),
+                    None => "a".into(),
+                }
+            })
+            .collect(),
         ctors,
         deriving: vec!["Show".into(), "Eq".into()],
     }
@@ -211,7 +304,12 @@ fn lower_ty(ty: &Ty) -> HsType {
         ),
         Ty::Tuple(ts) => HsType::Tuple(ts.iter().map(lower_ty).collect()),
         Ty::Named(n, args) => {
-            let mut t = HsType::Con(n.clone());
+            // IO () etc.
+            let mut t = if n.chars().next().is_some_and(|c| c.is_lowercase()) {
+                HsType::Var(n.clone())
+            } else {
+                HsType::Con(n.clone())
+            };
             for a in args {
                 t = HsType::App(Box::new(t), Box::new(lower_ty(a)));
             }
