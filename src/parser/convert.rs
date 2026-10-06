@@ -557,12 +557,57 @@ fn convert_block(block: &syn::Block, filename: &str, diags: &mut Diagnostics) ->
         let is_last = i + 1 == len;
         match stmt {
             syn::Stmt::Local(local) => {
+                let value = local
+                    .init
+                    .as_ref()
+                    .map(|init| convert_expr(&init.expr, filename, diags));
+                let span = span_of(local.span());
+                let pat = match &local.pat {
+                    Pat::Type(pt) => pt.pat.as_ref(),
+                    other => other,
+                };
+                // Expand `let (a, b) = v` into temp + fst/snd bindings (pair for now).
+                if let Pat::Tuple(t) = pat {
+                    let names: Vec<String> = t.elems.iter().map(|e| pat_name(e).0).collect();
+                    if names.len() == 2 {
+                        let tmp = format!("__tup{}", stmts.len());
+                        stmts.push(Stmt::Let {
+                            name: tmp.clone(),
+                            is_mut: false,
+                            ty: None,
+                            value: value.clone(),
+                            span,
+                        });
+                        stmts.push(Stmt::Let {
+                            name: names[0].clone(),
+                            is_mut: false,
+                            ty: None,
+                            value: Some(Expr::Call {
+                                func: Box::new(Expr::Path("fst".into(), span)),
+                                args: vec![Expr::Path(tmp.clone(), span)],
+                                span,
+                            }),
+                            span,
+                        });
+                        stmts.push(Stmt::Let {
+                            name: names[1].clone(),
+                            is_mut: false,
+                            ty: None,
+                            value: Some(Expr::Call {
+                                func: Box::new(Expr::Path("snd".into(), span)),
+                                args: vec![Expr::Path(tmp, span)],
+                                span,
+                            }),
+                            span,
+                        });
+                        continue;
+                    }
+                }
                 let (name, is_mut, _) = pat_name(&local.pat);
                 let ty = match &local.pat {
                     Pat::Type(pt) => Some(convert_type(&pt.ty, filename, diags)),
                     _ => None,
                 };
-                // Handle Pat::Type wrapping Ident
                 let (name, is_mut) = match &local.pat {
                     Pat::Type(pt) => {
                         let (n, m, _) = pat_name(&pt.pat);
@@ -570,16 +615,12 @@ fn convert_block(block: &syn::Block, filename: &str, diags: &mut Diagnostics) ->
                     }
                     _ => (name, is_mut),
                 };
-                let value = local
-                    .init
-                    .as_ref()
-                    .map(|init| convert_expr(&init.expr, filename, diags));
                 stmts.push(Stmt::Let {
                     name,
                     is_mut,
                     ty,
                     value,
-                    span: span_of(local.span()),
+                    span,
                 });
             }
             syn::Stmt::Expr(expr, semi) => {
@@ -766,24 +807,51 @@ pub fn convert_expr(expr: &syn::Expr, filename: &str, diags: &mut Diagnostics) -
                 let (line, col) = line_col(c.span());
                 diags.push(Diagnostic::unsupported("async/move closures", filename, line, col));
             }
-            // Support simple tuple patterns: |(a, b)| …
+            // Support simple pair patterns: |(a, b)| → \tup -> let a = fst tup; b = snd tup in …
             let mut params: Vec<String> = Vec::new();
             let mut body = convert_expr(&c.body, filename, diags);
+            let span = span_of(c.span());
             for p in &c.inputs {
                 match p {
                     Pat::Tuple(t) => {
                         let names: Vec<String> =
                             t.elems.iter().map(|e| pat_name(e).0).collect();
-                        // Encode as single param + destructure via nested lambdas later;
-                        // use synthetic name and rewrite body to project fields.
-                        let syn_name = format!("tup{}", params.len());
-                        // Replace uses… keep simple: flatten to multiple params if body only uses names
-                        for (i, n) in names.iter().enumerate() {
-                            let _ = i;
-                            params.push(n.clone());
+                        if names.len() == 2 {
+                            let syn_name = format!("tup{}", params.len());
+                            params.push(syn_name.clone());
+                            body = Expr::Block(Block {
+                                stmts: vec![
+                                    Stmt::Let {
+                                        name: names[0].clone(),
+                                        is_mut: false,
+                                        ty: None,
+                                        value: Some(Expr::Call {
+                                            func: Box::new(Expr::Path("fst".into(), span)),
+                                            args: vec![Expr::Path(syn_name.clone(), span)],
+                                            span,
+                                        }),
+                                        span,
+                                    },
+                                    Stmt::Let {
+                                        name: names[1].clone(),
+                                        is_mut: false,
+                                        ty: None,
+                                        value: Some(Expr::Call {
+                                            func: Box::new(Expr::Path("snd".into(), span)),
+                                            args: vec![Expr::Path(syn_name, span)],
+                                            span,
+                                        }),
+                                        span,
+                                    },
+                                ],
+                                expr: Some(Box::new(body)),
+                                span,
+                            });
+                        } else {
+                            for n in names {
+                                params.push(n);
+                            }
                         }
-                        let _ = syn_name;
-                        let _ = &mut body;
                     }
                     _ => params.push(pat_name(p).0),
                 }
@@ -791,7 +859,7 @@ pub fn convert_expr(expr: &syn::Expr, filename: &str, diags: &mut Diagnostics) -
             Expr::Closure {
                 params,
                 body: Box::new(body),
-                span: span_of(c.span()),
+                span,
             }
         }
         syn::Expr::Tuple(t) => Expr::Tuple(

@@ -121,6 +121,10 @@ fn default_imports(module: &Module) -> Vec<HsImport> {
             "isSuffixOf",
             "partition",
             "mapMaybe",
+            "find",
+            "findIndex",
+            "elemIndex",
+            "zipWith",
         ],
     );
     let needs_word = module_has_ty(module, |t| matches!(t, Ty::Word32 | Ty::Word64));
@@ -375,6 +379,13 @@ fn lower_exp(exp: &ir::Exp) -> HsExp {
                 .map(|(k, v)| (k.clone(), lower_exp(v)))
                 .collect(),
         },
+        ir::Exp::RecordUpdate { base, fields } => HsExp::RecordUpdate {
+            base: Box::new(lower_exp(base)),
+            fields: fields
+                .iter()
+                .map(|(k, v)| (k.clone(), lower_exp(v)))
+                .collect(),
+        },
         ir::Exp::Field(e, f) => {
             // Haskell record selector: field record
             HsExp::App(
@@ -472,7 +483,17 @@ fn lower_pat(pat: &ir::Pat) -> HsPat {
         ir::Pat::Var(v) => HsPat::Var(v.clone()),
         ir::Pat::Tuple(ps) => HsPat::Tuple(ps.iter().map(lower_pat).collect()),
         ir::Pat::Constr { name, args } => {
-            HsPat::Con(name.clone(), args.iter().map(lower_pat).collect())
+            if name == "[]" && args.is_empty() {
+                HsPat::List(vec![])
+            } else if name == ":" && args.len() == 2 {
+                // Infix cons — encode as Con with special name handled by pretty
+                HsPat::Con(
+                    "(:)".into(),
+                    args.iter().map(lower_pat).collect(),
+                )
+            } else {
+                HsPat::Con(name.clone(), args.iter().map(lower_pat).collect())
+            }
         }
         ir::Pat::Record { name, fields } => HsPat::Record(
             name.clone(),

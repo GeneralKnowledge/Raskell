@@ -124,6 +124,11 @@ pub enum Exp {
         name: String,
         fields: IndexMap<String, Exp>,
     },
+    /// Haskell record update: `base { field = value, … }`
+    RecordUpdate {
+        base: Box<Exp>,
+        fields: IndexMap<String, Exp>,
+    },
     Field(Box<Exp>, String),
     BinOp(BinOp, Box<Exp>, Box<Exp>),
     UnOp(UnOp, Box<Exp>),

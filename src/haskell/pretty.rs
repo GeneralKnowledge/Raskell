@@ -284,6 +284,13 @@ fn format_exp(exp: &HsExp, prec: u8) -> String {
                 .collect();
             format!("{name} {{ {} }}", fs.join(", "))
         }
+        HsExp::RecordUpdate { base, fields } => {
+            let fs: Vec<String> = fields
+                .iter()
+                .map(|(k, v)| format!("{k} = {}", format_exp(v, 0)))
+                .collect();
+            format!("{} {{ {} }}", format_exp(base, 10), fs.join(", "))
+        }
         HsExp::Field(e, f) => format!("{} {}", f, format_exp(e, 11)),
         HsExp::Paren(e) => format!("({})", format_exp(e, 0)),
         HsExp::Neg(e) => format!("-{}", format_exp(e, 11)),
@@ -317,7 +324,13 @@ fn format_pat(pat: &HsPat, atom: bool) -> String {
         HsPat::Var(v) => v.clone(),
         HsPat::Lit(l) => format_lit(l),
         HsPat::Con(n, args) => {
-            if args.is_empty() {
+            if n == "(:)" && args.len() == 2 {
+                format!(
+                    "({}:{})",
+                    format_pat(&args[0], true),
+                    format_pat(&args[1], true)
+                )
+            } else if args.is_empty() {
                 n.clone()
             } else {
                 let a: Vec<_> = args.iter().map(|p| format_pat(p, true)).collect();

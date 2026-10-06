@@ -1,0 +1,8 @@
+struct Point {
+    x: i32,
+    y: i32,
+}
+fn move_by(p: &mut Point, dx: i32, dy: i32) {
+    p.x += dx;
+    p.y += dy;
+}
