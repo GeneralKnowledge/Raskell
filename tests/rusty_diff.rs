@@ -288,6 +288,80 @@ fn diff_count_up_while() {
     );
 }
 
+#[test]
+fn diff_fold_temp_and_continue() {
+    assert_same(
+        r#"
+        fn calculate(values: Vec<i32>) -> i32 {
+            let mut total = 0;
+            for value in values {
+                let doubled = value * 2;
+                if value > 0 { total += doubled; }
+            }
+            total
+        }
+        fn run() -> i32 { calculate(vec![-2, -1, 0, 1, 2, 3]) }
+        "#,
+    );
+}
+
+#[test]
+fn diff_filter_map_continue() {
+    assert_same(
+        r#"
+        fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+            let mut result = Vec::new();
+            for value in values {
+                if value <= 0 { continue; }
+                result.push(value * 2);
+            }
+            result
+        }
+        fn run() -> Vec<i32> { positive_doubled(vec![-2, -1, 0, 1, 2, 3]) }
+        "#,
+    );
+}
+
+#[test]
+fn diff_first_positive_borrow() {
+    assert_same(
+        r#"
+        fn first_positive(values: &Vec<i32>) -> Option<i32> {
+            for value in values {
+                if *value > 0 { return Some(*value); }
+            }
+            None
+        }
+        fn run() -> i32 {
+            (match first_positive(&vec![-2, -1, 4, 5]) { Some(v) => v, None => -1 })
+                + (match first_positive(&vec![-3, -2]) { Some(v) => v, None => -1 })
+        }
+        "#,
+    );
+}
+
+#[test]
+fn diff_ugly_average() {
+    assert_same(
+        r#"
+        fn process(values: Vec<i32>) -> i32 {
+            let mut total = 0;
+            let mut count = 0;
+            for value in values {
+                if value < 0 { continue; }
+                let adjusted = value + 10;
+                total += adjusted;
+                count += 1;
+            }
+            if count == 0 { 0 } else { total / count }
+        }
+        fn run() -> i32 {
+            process(vec![-5, 0, 5, 10]) + process(vec![-1, -2]) + process(vec![2])
+        }
+        "#,
+    );
+}
+
 /// Lightweight property-style differential: several generated inputs for one pure fn.
 #[test]
 fn diff_property_filter_sum() {

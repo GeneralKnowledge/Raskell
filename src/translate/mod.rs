@@ -4,6 +4,7 @@
 //! and lowers them into idiomatic functional IR.
 
 pub mod explain;
+pub mod loop_analysis;
 mod lower;
 pub mod patterns;
 

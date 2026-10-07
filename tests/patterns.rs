@@ -196,6 +196,50 @@ fn gcd(mut a: i32, mut b: i32) -> i32 {
 }
 
 #[test]
+fn detects_filter_map_with_temp() {
+    let src = r#"
+fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+    let mut result = Vec::new();
+    for value in values {
+        let doubled = value * 2;
+        if doubled > 0 { result.push(doubled); }
+    }
+    result
+}
+"#;
+    let prog = parser::parse(src, "t.rs").expect("parse");
+    let Item::Function(f) = &prog.items[0] else {
+        panic!("expected function");
+    };
+    let (_res, _col, cond, mapped) =
+        patterns::detect_filter_map_push(&f.body).expect("filter_map");
+    // Temps must be substituted — no bare `doubled` path
+    let cond_s = format!("{cond:?}");
+    let mapped_s = format!("{mapped:?}");
+    assert!(!cond_s.contains("\"doubled\""), "{cond_s}");
+    assert!(!mapped_s.contains("\"doubled\""), "{mapped_s}");
+}
+
+#[test]
+fn detects_filter_map_continue() {
+    let src = r#"
+fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+    let mut result = Vec::new();
+    for value in values {
+        if value <= 0 { continue; }
+        result.push(value * 2);
+    }
+    result
+}
+"#;
+    let prog = parser::parse(src, "t.rs").expect("parse");
+    let Item::Function(f) = &prog.items[0] else {
+        panic!("expected function");
+    };
+    assert!(patterns::detect_filter_map_push(&f.body).is_some());
+}
+
+#[test]
 fn detects_while_accum_either_order() {
     let src = r#"
 fn count_up(n: i32) -> i32 {

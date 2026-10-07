@@ -46,15 +46,42 @@ If `check` or `translate` errors with `E0421`, that construct is intentionally u
 
 Ownership, borrowing, and lifetimes are **erased** when the meaning is clear. Mutation is rewritten into pure updates or higher-order functions when Raskell recognises the pattern.
 
-## Write Rust the way Raskell likes
+## Write ordinary Rust
+
+You do **not** need to memorise Raskell-approved AST shapes. These are equivalent for Raskell:
+
+```rust
+// if + push
+for value in values {
+    if value > 0 { result.push(value * 2); }
+}
+
+// temporary
+for value in values {
+    let doubled = value * 2;
+    if doubled > 0 { result.push(doubled); }
+}
+
+// continue
+for value in values {
+    if value <= 0 { continue; }
+    result.push(value * 2);
+}
+
+// iterators
+values.iter().map(|x| *x * 2).filter(|x| *x > 0).copied().collect()
+```
+
+All lower toward `map` / `filter`. Loop-local `let`s and `continue` are normalised before recognition.
 
 **Prefer**
 
 - Clear functions with explicit types on parameters / returns
 - `Option` / `Result` instead of panics for expected failure
-- Iterator chains or simple `for`/`while` with one obvious accumulator
+- Iterator chains **or** imperative loops with obvious intent (Raskell converges them)
 - Traits for shared behaviour (they become type classes)
 - `?` inside a function that already returns `Result` / `Option`
+- Ordinary `&` / `&mut` / moves when behaviour is clear (ownership is erased)
 
 **Avoid (rejected or poorly supported)**
 
@@ -63,6 +90,8 @@ Ownership, borrowing, and lifetimes are **erased** when the meaning is clear. Mu
 - Arbitrary macros (only `vec!`, `println!`, `print!`, `format!`)
 - Clever interior mutability (`RefCell`, mutexes, atomics)
 - Patterns Raskell cannot prove equivalent — it will refuse rather than guess
+
+Stress corpus of realistic programs: `tests/rusty/` (see `reports/coverage.md`).
 
 ## Mini cookbook
 
@@ -125,9 +154,9 @@ fn triangle(n: i32) -> i32 {
 
 `raskell explain file.rs` prints, per function:
 
-1. **Detected** — which Rust patterns Raskell recognised
-2. **Translation** — the semantic rewrite it chose
-3. **Generated** — a short summary of the Haskell shape
+1. **Detected** — what computation Raskell saw (traversal, filtering, accumulation, …)
+2. **Semantic form** — the meaning-level rewrite (`filter + map`, `sum`, `find`, …)
+3. **Haskell strategy** — the generated function body
 4. **Full module** — the complete `.hs` you can paste into GHC
 
 You do not need to invent Haskell idioms yourself. Write the Rust you would write for a small library function, run `explain`, and keep the output when it matches your intent.

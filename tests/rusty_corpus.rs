@@ -164,3 +164,110 @@ fn semantic_convergence_sum() {
     assert!(a.contains("sum"), "{a}");
     assert!(b.contains("sum"), "{b}");
 }
+
+fn assert_hs_ok(src: &str) -> String {
+    let r = raskell::translate(src, "t.rs").unwrap();
+    assert!(!r.diagnostics.has_errors(), "{}", r.diagnostics);
+    r.haskell_source
+}
+
+#[test]
+fn convergence_filter_map_four_ways() {
+    let if_push = r#"
+        fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+            let mut result = Vec::new();
+            for value in values {
+                if value > 0 { result.push(value * 2); }
+            }
+            result
+        }
+    "#;
+    let temp = r#"
+        fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+            let mut result = Vec::new();
+            for value in values {
+                let doubled = value * 2;
+                if doubled > 0 { result.push(doubled); }
+            }
+            result
+        }
+    "#;
+    let cont = r#"
+        fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+            let mut result = Vec::new();
+            for value in values {
+                if value <= 0 { continue; }
+                result.push(value * 2);
+            }
+            result
+        }
+    "#;
+    let iter = r#"
+        fn positive_doubled(values: Vec<i32>) -> Vec<i32> {
+            values.iter().map(|x| *x * 2).filter(|x| *x > 0).copied().collect()
+        }
+    "#;
+    for (name, src) in [
+        ("if_push", if_push),
+        ("temp", temp),
+        ("continue", cont),
+        ("iter", iter),
+    ] {
+        let hs = assert_hs_ok(src);
+        assert!(
+            hs.contains("filter") && hs.contains("map"),
+            "{name} missing filter/map:\n{hs}"
+        );
+        // Must not leave unbound temp names
+        assert!(
+            !hs.contains("doubled") || hs.contains("x * 2"),
+            "{name} left unbound temp:\n{hs}"
+        );
+    }
+}
+
+#[test]
+fn convergence_filtered_fold_four_ways() {
+    let if_ = r#"
+        fn calculate(values: Vec<i32>) -> i32 {
+            let mut total = 0;
+            for value in values {
+                if value > 0 { total += value * 2; }
+            }
+            total
+        }
+    "#;
+    let temp = r#"
+        fn calculate(values: Vec<i32>) -> i32 {
+            let mut total = 0;
+            for value in values {
+                let doubled = value * 2;
+                if value > 0 { total += doubled; }
+            }
+            total
+        }
+    "#;
+    let cont = r#"
+        fn calculate(values: Vec<i32>) -> i32 {
+            let mut total = 0;
+            for value in values {
+                if value <= 0 { continue; }
+                total += value * 2;
+            }
+            total
+        }
+    "#;
+    let iter = r#"
+        fn calculate(values: Vec<i32>) -> i32 {
+            values.iter().filter(|x| **x > 0).map(|x| *x * 2).sum()
+        }
+    "#;
+    for (name, src) in [("if", if_), ("temp", temp), ("continue", cont), ("iter", iter)] {
+        let hs = assert_hs_ok(src);
+        assert!(hs.contains("sum"), "{name} missing sum:\n{hs}");
+        assert!(
+            hs.contains("filter") && hs.contains("map"),
+            "{name} missing filter/map:\n{hs}"
+        );
+    }
+}
